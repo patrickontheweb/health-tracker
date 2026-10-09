@@ -12,12 +12,11 @@ Use three PowerShell terminals, starting in the project directory:
    The script downloads DynamoDB Local on first use and verifies its published
    SHA-256 checksum. Leave the terminal running. Development records are stored
    under `.local-data/dynamodb/`, which Git ignores.
-2. **Backend:** `powershell -ExecutionPolicy Bypass -File scripts/start-backend.ps1 -UserPoolId YOUR_EXISTING_POOL_ID`
-   Find the pool ID in the `health-habits` CloudFormation stack's `UserPoolId`
-   output. The script builds Spring Boot and starts the API at
+2. **Backend:** `powershell -ExecutionPolicy Bypass -File scripts/start-backend.ps1`
+   The existing Cognito pool is configured for login. To use a different pool,
+   pass `-UserPoolId YOUR_POOL_ID`. The script builds Spring Boot and starts the API at
    `http://127.0.0.1:8080`. It creates the `health-habits-dev` table if absent,
-   preserving existing local records. Without `-UserPoolId`, public reads work
-   but Cognito editing is not configured.
+   preserving existing local records.
 3. **Angular:** `powershell -ExecutionPolicy Bypass -File scripts/start-frontend.ps1`
    Open **http://127.0.0.1:4200**. Development builds use the local
    API automatically; production builds retain the AWS configuration.

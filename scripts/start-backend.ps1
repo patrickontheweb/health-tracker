@@ -4,7 +4,7 @@ $javaExe=Find-ProjectJava
 $env:JAVA_HOME=Split-Path (Split-Path $javaExe -Parent) -Parent
 if ($UserPoolId) { $env:COGNITO_ISSUER="https://cognito-idp.us-east-1.amazonaws.com/$UserPoolId" }
 if (!(Test-Path env:COGNITO_ISSUER)) {
-    Write-Host 'Public local viewing is ready. To enable editing, pass -UserPoolId with the existing Cognito pool ID.'
+    Write-Host 'Using the existing health tracker Cognito pool for login. Records go only to DynamoDB Local.'
 }
 $mavenExe=Find-ProjectMaven
 Push-Location (Join-Path $projectRoot 'backend')
