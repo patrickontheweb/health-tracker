@@ -1,0 +1,17 @@
+.tools/
+frontend/node_modules/
+frontend/.angular/
+frontend/dist/
+backend/target/
+__pycache__/
+*.zip
+.env
+.env.*
+!.env.example
+.local-data/
+.local-settings.ps1
+dist/
+release/
+*.log
+*.db
+*.db-journal

@@ -1,0 +1,1 @@
+{"name":"health-habits","version":"1.0.0","private":true,"type":"module","scripts":{"preview":"node server.mjs","template":"node aws/build-template.mjs"}}

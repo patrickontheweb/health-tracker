@@ -1,0 +1,7 @@
+export interface Entry {cardio:number;lifting:number;produce:number;revision:number;}
+export type Entries=Record<string,Entry>;
+export function dateKey(date=new Date()):string{return `${date.getFullYear()}-${String(date.getMonth()+1).padStart(2,'0')}-${String(date.getDate()).padStart(2,'0')}`;}
+export function parseDate(key:string):Date{if(!/^\d{4}-\d{2}-\d{2}$/.test(key))throw new Error('Choose a valid date.');const [y,m,d]=key.split('-').map(Number),date=new Date(y,m-1,d,12);if(dateKey(date)!==key)throw new Error('Choose a valid date.');return date;}
+export function weekKeys(key:string):string[]{const date=parseDate(key);date.setDate(date.getDate()-((date.getDay()+6)%7));return Array.from({length:7},(_,i)=>{const d=new Date(date);d.setDate(d.getDate()+i);return dateKey(d);});}
+export function totals(entries:Entries,key:string){return weekKeys(key).reduce((sum,date)=>{const r=entries[date];if(r){sum.cardio+=r.cardio;sum.lifting+=r.lifting;sum.produceDays+=Number(r.produce>=5);}return sum;},{cardio:0,lifting:0,produceDays:0});}
+export function validateTotals(values:unknown): asserts values is Pick<Entry,'cardio'|'lifting'|'produce'>{if(!values||typeof values!=='object')throw new Error('Invalid daily totals.');for(const key of ['cardio','lifting','produce']){const value=(values as Record<string,unknown>)[key];if(!Number.isSafeInteger(value)||Number(value)<0)throw new Error('Enter whole numbers of zero or more.');}}
