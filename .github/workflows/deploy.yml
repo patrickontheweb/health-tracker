@@ -1,0 +1,77 @@
+name: Test and deploy to AWS
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: health-tracker-production
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    env:
+      AWS_REGION: us-east-1
+      AWS_STACK_NAME: health-habits
+      AWS_ARTIFACT_BUCKET: pcmckenna-health
+      DYNAMODB_TEST_ENDPOINT: http://127.0.0.1:8000
+    services:
+      dynamodb:
+        image: amazon/dynamodb-local:3.3.1
+        ports:
+          - 8000:8000
+    steps:
+      - name: Check out source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Set up Node
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: '24'
+          package-manager-cache: false
+      - name: Set up Java
+        uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6.0.1
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+          cache-dependency-path: backend/pom.xml
+      - name: Install pnpm
+        run: npm install --global pnpm@11.19.0
+      - name: Test deployment logic
+        run: node --test test/deploy.test.mjs
+      - name: Test and build website
+        working-directory: frontend
+        run: |
+          pnpm install --frozen-lockfile
+          pnpm test
+          pnpm build
+      - name: Test and package backend
+        working-directory: backend
+        run: mvn --batch-mode --no-transfer-progress clean verify
+      - name: Check deployment setup
+        env:
+          DEPLOY_ROLE: ${{ vars.AWS_DEPLOY_ROLE_ARN }}
+        run: |
+          if [ -z "$DEPLOY_ROLE" ]; then
+            echo '::error::Set AWS_DEPLOY_ROLE_ARN in repository Actions variables after updating the AWS stack. See AUTO-DEPLOY.md.'
+            exit 1
+          fi
+      - name: Authenticate to AWS
+        uses: aws-actions/configure-aws-credentials@e1253824e5c10ff9df46874f81ed3ec929e19cfd # v6.3.0
+        with:
+          role-to-assume: ${{ vars.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: us-east-1
+          role-session-name: deploy-${{ github.run_id }}
+          retry-max-attempts: 3
+      - name: Deploy and check the live site
+        run: node scripts/deploy-aws.mjs

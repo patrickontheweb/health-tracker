@@ -19,6 +19,17 @@ r.Authorizer={Type:'AWS::ApiGatewayV2::Authorizer',Properties:{ApiId:ref('Api'),
 r.ReadRoute={Type:'AWS::ApiGatewayV2::Route',Properties:{ApiId:ref('Api'),RouteKey:'GET /entries',AuthorizationType:'NONE',Target:sub('integrations/${Integration}')}};
 r.WriteRoute={Type:'AWS::ApiGatewayV2::Route',Properties:{ApiId:ref('Api'),RouteKey:'PUT /entries/{day}',AuthorizationType:'JWT',AuthorizerId:ref('Authorizer'),AuthorizationScopes:['aws.cognito.signin.user.admin'],Target:sub('integrations/${Integration}')}};
 r.ApiPermission={Type:'AWS::Lambda::Permission',Properties:{FunctionName:ref('HabitFunction'),Action:'lambda:InvokeFunction',Principal:'apigateway.amazonaws.com',SourceArn:sub('arn:${AWS::Partition}:execute-api:${AWS::Region}:${AWS::AccountId}:${Api}/*/*/entries*')}};
-template.Outputs={WebsiteUrl:{Value:sub('https://${Website.DomainName}')},WebsiteBucket:{Value:ref('WebsiteBucket')},ApiUrl:{Value:get('Api','ApiEndpoint')},Region:{Value:ref('AWS::Region')},ClientId:{Value:ref('EditorClient')},UserPoolId:{Value:ref('EditorPool')},DistributionId:{Value:ref('Website')}};
+template.Parameters.ExistingGitHubOidcProviderArn={Type:'String',Default:'',Description:'Leave blank to create the GitHub OIDC provider. If this account already has one, enter its ARN.'};
+template.Conditions={CreateGitHubProvider:{'Fn::Equals':[ref('ExistingGitHubOidcProviderArn'),'']}};
+r.GitHubProvider={Type:'AWS::IAM::OIDCProvider',Condition:'CreateGitHubProvider',Properties:{Url:'https://token.actions.githubusercontent.com',ClientIdList:['sts.amazonaws.com']}};
+r.GitHubDeployRole={Type:'AWS::IAM::Role',Properties:{Description:'Deploy only this health tracker from GitHub main',MaxSessionDuration:3600,AssumeRolePolicyDocument:{Version:'2012-10-17',Statement:[{Effect:'Allow',Principal:{Federated:{'Fn::If':['CreateGitHubProvider',ref('GitHubProvider'),ref('ExistingGitHubOidcProviderArn')]}},Action:'sts:AssumeRoleWithWebIdentity',Condition:{StringEquals:{'token.actions.githubusercontent.com:aud':'sts.amazonaws.com','token.actions.githubusercontent.com:sub':'repo:patrickontheweb@10171054/health-tracker@1411953946:ref:refs/heads/main'}}}]},Policies:[{PolicyName:'DeployHealthTracker',PolicyDocument:{Version:'2012-10-17',Statement:[
+    {Effect:'Allow',Action:['cloudformation:DescribeStacks'],Resource:sub('arn:${AWS::Partition}:cloudformation:${AWS::Region}:${AWS::AccountId}:stack/${AWS::StackName}/*')},
+    {Effect:'Allow',Action:['lambda:GetFunction','lambda:GetFunctionConfiguration','lambda:UpdateFunctionCode'],Resource:get('HabitFunction','Arn')},
+    {Effect:'Allow',Action:['s3:GetBucketLocation','s3:ListBucket'],Resource:get('WebsiteBucket','Arn')},
+    {Effect:'Allow',Action:['s3:GetObject','s3:PutObject'],Resource:sub('${WebsiteBucket.Arn}/*')},
+    {Effect:'Allow',Action:['s3:GetObject','s3:PutObject'],Resource:sub('arn:${AWS::Partition}:s3:::${ArtifactBucket}/releases/*')},
+    {Effect:'Allow',Action:['cloudfront:CreateInvalidation','cloudfront:GetInvalidation'],Resource:sub('arn:${AWS::Partition}:cloudfront::${AWS::AccountId}:distribution/${Website}')}
+]}}]}};
+template.Outputs={WebsiteUrl:{Value:sub('https://${Website.DomainName}')},WebsiteBucket:{Value:ref('WebsiteBucket')},ApiUrl:{Value:get('Api','ApiEndpoint')},Region:{Value:ref('AWS::Region')},ClientId:{Value:ref('EditorClient')},UserPoolId:{Value:ref('EditorPool')},DistributionId:{Value:ref('Website')},ApiFunctionName:{Value:ref('HabitFunction')},GitHubDeployRoleArn:{Value:get('GitHubDeployRole','Arn')}};
 await writeFile(new URL('./template.json',import.meta.url),JSON.stringify(template,null,2)+'\n');
 console.log('Created aws/template.json');

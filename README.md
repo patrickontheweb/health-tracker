@@ -30,6 +30,10 @@ To preview the production build, run `pnpm build` in `frontend/`, then `node ser
 
 ## Deploy through the AWS console
 
+For automatic application deployments on every push to `main`, complete the
+one-time setup in [AUTO-DEPLOY.md](AUTO-DEPLOY.md). The workflow tests and builds
+both components, then uses a restricted AWS role to deploy them.
+
 Use one AWS region throughout, for example `us-east-1`.
 
 1. In S3, use an existing private bucket or create one for deployment artifacts. Upload `release/health-habits-api-lambda.jar` with object key `health-habits-api-lambda.jar`.
