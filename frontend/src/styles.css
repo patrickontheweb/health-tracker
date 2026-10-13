@@ -32,3 +32,5 @@ footer{text-align:right;border-top:0}
 .calendar-week-summary .week-goal-missed{color:#ae4965}
 
 .weekly-metric.week-goal-met .weekly-heart,.weekly-metric.week-goal-met svg{color:#236645}
+
+.calendar-day.below .calendar-food>span{filter:grayscale(1);opacity:.45}
