@@ -21,9 +21,10 @@
       "Default": "",
       "AllowedValues": [
         "",
-        "health.mckennastuff.com"
+        "health.mckennastuff.com",
+        "lifestylerx.org"
       ],
-      "Description": "Leave blank for the CloudFront address, or use health.mckennastuff.com after certificate validation."
+      "Description": "Leave blank for the CloudFront address, or use health.mckennastuff.com or lifestylerx.org after certificate validation."
     },
     "CustomDomainCertificateArn": {
       "Type": "String",

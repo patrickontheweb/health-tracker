@@ -44,4 +44,14 @@ class BrowserCorsTest {
         assertEquals(403,response.statusCode());
         assertTrue(response.headers().firstValue("Access-Control-Allow-Origin").isEmpty());
     }
+    @Test void productionHasNoDevLogin() throws Exception {
+        var response=browser.send(HttpRequest.newBuilder(URI.create("http://127.0.0.1:"+port+"/dev/login"))
+            .POST(HttpRequest.BodyPublishers.noBody()).build(),HttpResponse.BodyHandlers.ofString());
+        assertTrue(response.statusCode()==401||response.statusCode()==403);
+    }
+    @Test void productionRejectsDevelopmentTokens() throws Exception {
+        var response=browser.send(HttpRequest.newBuilder(URI.create("http://127.0.0.1:"+port+"/entries/2026-01-01"))
+            .header("Authorization","Bearer dev-not-issued").PUT(HttpRequest.BodyPublishers.ofString("{}")).build(),HttpResponse.BodyHandlers.ofString());
+        assertEquals(401,response.statusCode());
+    }
 }

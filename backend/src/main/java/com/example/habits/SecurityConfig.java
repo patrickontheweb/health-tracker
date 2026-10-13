@@ -18,28 +18,36 @@ import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 @Configuration
 public class SecurityConfig {
-    @Bean JwtDecoder jwtDecoder(@Value("${habits.issuer}") String issuer, @Value("${habits.client-id}") String clientId) {
+    @Bean JwtDecoder jwtDecoder(@Value("${habits.issuer}") String issuer, @Value("${habits.client-id}") String clientId,
+        org.springframework.beans.factory.ObjectProvider<DevLoginController> development) {
         NimbusJwtDecoder decoder = NimbusJwtDecoder.withJwkSetUri(issuer + "/.well-known/jwks.json").build();
         decoder.setJwtValidator(new DelegatingOAuth2TokenValidator<>(JwtValidators.createDefaultWithIssuer(issuer), jwt ->
             "access".equals(jwt.getClaimAsString("token_use")) && clientId.equals(jwt.getClaimAsString("client_id"))
                 ? OAuth2TokenValidatorResult.success()
                 : OAuth2TokenValidatorResult.failure(new OAuth2Error("invalid_token"))));
-        return decoder;
+        return token -> {
+            var local=development.getIfAvailable();
+            if(local!=null){var jwt=local.decode(token);if(jwt!=null)return jwt;}
+            return decoder.decode(token);
+        };
     }
     @Bean SecurityFilterChain security(HttpSecurity http,
-        @org.springframework.beans.factory.annotation.Qualifier("corsConfigurationSource") CorsConfigurationSource source) throws Exception {
+        @org.springframework.beans.factory.annotation.Qualifier("corsConfigurationSource") CorsConfigurationSource source,
+        org.springframework.beans.factory.ObjectProvider<DevLoginController> development) throws Exception {
         return http.csrf(csrf -> csrf.disable()).cors(cors -> cors.configurationSource(source))
             .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
             .authorizeHttpRequests(auth -> auth
                 .requestMatchers(HttpMethod.GET, "/entries").permitAll()
                 .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
+                .requestMatchers(HttpMethod.POST,"/dev/login").access((authentication,context)->new org.springframework.security.authorization.AuthorizationDecision(development.getIfAvailable()!=null))
                 .requestMatchers(HttpMethod.PUT, "/entries/*").hasAuthority("SCOPE_aws.cognito.signin.user.admin")
                 .anyRequest().denyAll())
             .oauth2ResourceServer(oauth -> oauth.jwt(jwt -> {})).build();
     }
-    @Bean CorsConfigurationSource corsConfigurationSource(@Value("${habits.origin}") String origin) {
+    @Bean CorsConfigurationSource corsConfigurationSource(@Value("${habits.origin}") String origin,
+        org.springframework.beans.factory.ObjectProvider<DevLoginController> development) {
         CorsConfiguration config = new CorsConfiguration();
-        config.setAllowedOrigins(List.of(origin));config.setAllowedMethods(List.of("GET", "PUT", "OPTIONS"));
+        config.setAllowedOrigins(List.of(origin));config.setAllowedMethods(development.getIfAvailable()==null?List.of("GET", "PUT", "OPTIONS"):List.of("GET", "PUT", "POST", "OPTIONS"));
         config.setAllowedHeaders(List.of("Content-Type", "Authorization"));
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();source.registerCorsConfiguration("/**", config);return source;
     }

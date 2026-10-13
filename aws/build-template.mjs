@@ -21,7 +21,7 @@ r.WriteRoute={Type:'AWS::ApiGatewayV2::Route',Properties:{ApiId:ref('Api'),Route
 r.ApiPermission={Type:'AWS::Lambda::Permission',Properties:{FunctionName:ref('HabitFunction'),Action:'lambda:InvokeFunction',Principal:'apigateway.amazonaws.com',SourceArn:sub('arn:${AWS::Partition}:execute-api:${AWS::Region}:${AWS::AccountId}:${Api}/*/*/entries*')}};
 template.Parameters.ExistingGitHubOidcProviderArn={Type:'String',Default:'',Description:'Leave blank to create the GitHub OIDC provider. If this account already has one, enter its ARN.'};
 template.Conditions={CreateGitHubProvider:{'Fn::Equals':[ref('ExistingGitHubOidcProviderArn'),'']}};
-template.Parameters.CustomDomainName={Type:'String',Default:'',AllowedValues:['','health.mckennastuff.com'],Description:'Leave blank for the CloudFront address, or use health.mckennastuff.com after certificate validation.'};
+template.Parameters.CustomDomainName={Type:'String',Default:'',AllowedValues:['','health.mckennastuff.com','lifestylerx.org'],Description:'Leave blank for the CloudFront address, or use health.mckennastuff.com or lifestylerx.org after certificate validation.'};
 template.Parameters.CustomDomainCertificateArn={Type:'String',Default:'',AllowedPattern:'^$|^arn:aws:acm:us-east-1:[0-9]{12}:certificate/[a-zA-Z0-9-]+$',Description:'Issued ACM certificate ARN in us-east-1 covering the custom domain. Leave blank when not using a custom domain.'};
 template.Conditions.UseCustomDomain={'Fn::Not':[{'Fn::Equals':[ref('CustomDomainName'),'']}]};
 const domainBlank={'Fn::Equals':[ref('CustomDomainName'),'']},certificateBlank={'Fn::Equals':[ref('CustomDomainCertificateArn'),'']};

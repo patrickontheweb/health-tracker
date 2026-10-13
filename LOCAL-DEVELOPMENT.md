@@ -25,8 +25,12 @@ This desktop already has portable Java 21 and Maven under `.tools/`, plus bundle
 pnpm; the scripts find them automatically. On another machine install Java 21, Maven 3.9, Node 24
 and pnpm 11. Set `JAVA_HOME` to Java 21.
 
-Sign in using the existing Cognito username/password. This requires internet for
-sign-in and token verification; daily entries are stored in the **local** database.
+Click **Dev Login** for password-free local editing, or sign in using the existing
+Cognito username/password. Dev Login appears only in Angular's development build
+with loopback local API configuration. The endpoint and its short-lived, in-memory
+tokens exist only in Spring Boot's local profile with a local database; they are
+disabled in production and Lambda. Dev Login does not require internet. Cognito
+sign-in still requires internet; daily entries are stored in the **local** database.
 The production API and its records remain separate. Refreshing or reopening the
 page requires signing in again, as on the live site.
 
