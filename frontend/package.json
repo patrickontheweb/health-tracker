@@ -3,8 +3,8 @@
   "version": "1.0.0",
   "private": true,
   "scripts": {
-    "start": "ng serve --host 127.0.0.1 --port 4200",
-    "build": "ng build",
+    "start": "node build-version.mjs && ng serve --host 127.0.0.1 --port 4200",
+    "build": "node build-version.mjs && ng build",
     "test": "node --test test/*.test.mjs"
   },
   "dependencies": {
