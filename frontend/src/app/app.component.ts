@@ -20,6 +20,7 @@ export class AppComponent implements OnInit {
   calendarDays=computed(()=>monthGrid(this.calendarMonth()));
   calendarRows=computed(()=>monthRows(this.calendarMonth()));
   calendarWeekTotals(week:string){return totals(this.calendarEntries(),week);}
+  weekGoalMissed(week:string,goal:'cardio'|'lifting'){return this.calendarLoaded()&&weekKeys(week)[6]<this.today&&this.calendarWeekTotals(week)[goal]<(goal==='cardio'?150:2);}
   calendarTitle=computed(()=>parseDate(`${this.calendarMonth()}-01`).toLocaleDateString(undefined,{month:'long',year:'numeric'}));
   monthPicker=viewChild<ElementRef<HTMLDialogElement>>('monthPicker');pickedMonth=Number(this.today.slice(5,7));pickedYear=Number(this.today.slice(0,4));
   readonly monthOptions=Array.from({length:12},(_,index)=>({value:index+1,label:new Date(2026,index,1).toLocaleDateString(undefined,{month:'long'})}));

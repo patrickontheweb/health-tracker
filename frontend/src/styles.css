@@ -28,3 +28,7 @@ footer{text-align:right;border-top:0}
 .calendar-day .calendar-food{flex-wrap:nowrap;gap:1px}.calendar-day .calendar-food>span{min-width:0;flex:0 1 auto;font-size:clamp(.45rem,1.2vw,1rem)}.calendar-day .calendar-date{text-decoration:underline;text-underline-offset:3px}.calendar-day.calendar-today .calendar-date{text-decoration:underline}@media(max-width:520px){.calendar-day .calendar-food{gap:0}.calendar-day .calendar-food>span{font-size:.32rem}}
 
 .log-export{display:flex;justify-content:flex-end;margin-top:16px}.tracker-footer{display:flex;align-items:center;justify-content:space-between;gap:16px}.tracker-footer p{margin-left:auto}.export-dialog{max-width:520px}.export-dialog .month-year-fields{grid-template-columns:1fr 1fr}.export-dialog .error{color:#b42342}
+
+.calendar-week-summary .week-goal-missed{color:#ae4965}
+
+.weekly-metric.week-goal-met .weekly-heart,.weekly-metric.week-goal-met svg{color:#236645}
