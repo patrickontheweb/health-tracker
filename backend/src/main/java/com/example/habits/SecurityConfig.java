@@ -26,8 +26,9 @@ public class SecurityConfig {
                 : OAuth2TokenValidatorResult.failure(new OAuth2Error("invalid_token"))));
         return decoder;
     }
-    @Bean SecurityFilterChain security(HttpSecurity http) throws Exception {
-        return http.csrf(csrf -> csrf.disable()).cors(cors -> {})
+    @Bean SecurityFilterChain security(HttpSecurity http,
+        @org.springframework.beans.factory.annotation.Qualifier("corsConfigurationSource") CorsConfigurationSource source) throws Exception {
+        return http.csrf(csrf -> csrf.disable()).cors(cors -> cors.configurationSource(source))
             .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
             .authorizeHttpRequests(auth -> auth
                 .requestMatchers(HttpMethod.GET, "/entries").permitAll()
@@ -36,7 +37,7 @@ public class SecurityConfig {
                 .anyRequest().denyAll())
             .oauth2ResourceServer(oauth -> oauth.jwt(jwt -> {})).build();
     }
-    @Bean CorsConfigurationSource cors(@Value("${habits.origin}") String origin) {
+    @Bean CorsConfigurationSource corsConfigurationSource(@Value("${habits.origin}") String origin) {
         CorsConfiguration config = new CorsConfiguration();
         config.setAllowedOrigins(List.of(origin));config.setAllowedMethods(List.of("GET", "PUT", "OPTIONS"));
         config.setAllowedHeaders(List.of("Content-Type", "Authorization"));
