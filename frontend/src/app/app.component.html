@@ -6,10 +6,14 @@
   </section>
   <div class="workspace"><section class="panel log"><div class="section-heading"><h2>Your daily log</h2><span>{{!loaded() ? 'Not loaded' : daily() ? 'Saved entry' : 'No entry yet'}}</span></div><form (ngSubmit)="save()" #logForm="ngForm">
     <label for="date">Date</label><input type="date" id="date" name="date" [ngModel]="selectedDate()" (ngModelChange)="selectDate($event)" [max]="today" [disabled]="saving()" required>
-    <fieldset [disabled]="!auth.signedIn() || loading() || saving() || !loaded()"><p class="hint">Enter the totals for this day. Saving replaces its previous entry.</p>
+    <fieldset [disabled]="!auth.signedIn() || loading() || saving() || !loaded()"><p class="hint">Enter exercise totals, then save the day. Serving icons save as you tap them.</p>
     <label for="cardio">Cardiovascular exercise <span>minutes</span></label><input type="number" id="cardio" name="cardio" [(ngModel)]="cardio" min="0" step="1" inputmode="numeric" required>
     <label for="lifting">Weightlifting <span>sessions</span></label><input type="number" id="lifting" name="lifting" [(ngModel)]="lifting" min="0" step="1" inputmode="numeric" required>
-    <label for="produce">Fruit and/or vegetables <span>servings</span></label><input type="number" id="produce" name="produce" [(ngModel)]="produce" min="0" step="1" inputmode="numeric" required>
+    <div class="produce-heading"><span id="produce-label">Fruit and/or vegetables</span><span>{{produce}} / 5 servings</span></div>
+    <div class="produce-icons" role="group" aria-labelledby="produce-label" aria-describedby="produce-help">
+      @for(icon of produceIcons;track $index){<button type="button" class="produce-button" [class.counted]="produceSelections[$index]" [attr.aria-pressed]="produceSelections[$index]" [attr.aria-label]="'Serving '+($index+1)+' of 5: '+(produceSelections[$index]?'counted; click to remove':'not counted; click to add')" (click)="toggleProduce($index)"><span aria-hidden="true">{{icon}}</span></button>}
+    </div>
+    <p class="hint produce-help" id="produce-help">Tap an icon each time you eat a serving. Each tap saves automatically; tap again to undo.</p>
     <button class="primary" type="submit" [disabled]="logForm.invalid">{{saving() ? 'Saving…' : 'Save day'}}</button></fieldset>
     <p class="status" [class.error]="error()" role="status" aria-live="polite">{{status()}}</p><p class="hint">{{auth.signedIn() ? 'Your saved changes are visible to everyone.' : 'Everyone can view progress. Sign in to log or edit a day.'}}</p>
   </form></section>
