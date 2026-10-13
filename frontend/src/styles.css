@@ -34,3 +34,15 @@ footer{text-align:right;border-top:0}
 .weekly-metric.week-goal-met .weekly-heart,.weekly-metric.week-goal-met svg{color:#236645}
 
 .calendar-day.below .calendar-food>span{filter:grayscale(1);opacity:.45}
+
+.month-link{text-decoration:none}
+
+.month-link{border:1px solid #c6d0e0;border-radius:8px;background:#f5f7fb;padding:8px 16px;color:#17243a}.month-link:hover:not(:disabled){background:#e8eef8;border-color:#1650d8}
+
+.month-picker-actions{display:flex;align-items:center;justify-content:space-between;gap:16px;margin-top:16px}.month-picker-actions .primary{margin-top:0}
+
+.month-header-actions{display:flex;align-items:center;gap:14px}
+
+.month-picker{max-width:440px}.month-picker #month-picker-title{white-space:nowrap}.month-picker .section-heading{gap:12px}.month-header-actions{margin-left:auto}
+
+.calendar-month-actions{display:flex;align-items:center;justify-content:center;gap:14px;flex-wrap:wrap}

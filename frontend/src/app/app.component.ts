@@ -22,9 +22,11 @@ export class AppComponent implements OnInit {
   calendarWeekTotals(week:string){return totals(this.calendarEntries(),week);}
   weekGoalMissed(week:string,goal:'cardio'|'lifting'){return this.calendarLoaded()&&weekKeys(week)[6]<this.today&&this.calendarWeekTotals(week)[goal]<(goal==='cardio'?150:2);}
   calendarTitle=computed(()=>parseDate(`${this.calendarMonth()}-01`).toLocaleDateString(undefined,{month:'long',year:'numeric'}));
+  calendarSeasonIcon=computed(()=>{const month=Number(this.calendarMonth().slice(5,7));return month===12||month<=2?'❄️':month<=5?'🌺':month<=8?'🌞':'🍂';});
   monthPicker=viewChild<ElementRef<HTMLDialogElement>>('monthPicker');pickedMonth=Number(this.today.slice(5,7));pickedYear=Number(this.today.slice(0,4));
   readonly monthOptions=Array.from({length:12},(_,index)=>({value:index+1,label:new Date(2026,index,1).toLocaleDateString(undefined,{month:'long'})}));
   openMonthPicker(){if(this.saving())return;this.pickedMonth=Number(this.calendarMonth().slice(5,7));this.pickedYear=Number(this.calendarMonth().slice(0,4));this.monthPicker()?.nativeElement.showModal();}
+  async chooseToday(){if(this.saving())return;this.monthPicker()?.nativeElement.close();await this.selectDate(this.today);}
   async chooseMonth(){if(!Number.isInteger(this.pickedYear)||this.pickedYear<1000||this.pickedYear>9999)return;const month=`${this.pickedYear}-${String(this.pickedMonth).padStart(2,'0')}`;try{parseDate(`${month}-01`);}catch{return;}this.calendarMonth.set(month);this.monthPicker()?.nativeElement.close();await this.loadCalendar();}
   readonly weekdays=['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
   dialog=viewChild<ElementRef<HTMLDialogElement>>('authDialog');
