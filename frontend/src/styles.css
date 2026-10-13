@@ -46,3 +46,5 @@ footer{text-align:right;border-top:0}
 .month-picker{max-width:440px}.month-picker #month-picker-title{white-space:nowrap}.month-picker .section-heading{gap:12px}.month-header-actions{margin-left:auto}
 
 .calendar-month-actions{display:flex;align-items:center;justify-content:center;gap:14px;flex-wrap:wrap}
+
+:root{background:#17212f}.tracker-footer{color:#aebbd0}
