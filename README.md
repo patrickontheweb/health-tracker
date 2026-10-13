@@ -30,9 +30,10 @@ To preview the production build, run `pnpm build` in `frontend/`, then `node ser
 
 ## Deploy through the AWS console
 
-For automatic application deployments on every push to `main`, complete the
-one-time setup in [AUTO-DEPLOY.md](AUTO-DEPLOY.md). The workflow tests and builds
-both components, then uses a restricted AWS role to deploy them.
+Production deployment is manual and requires an explicit request. Follow
+[AUTO-DEPLOY.md](AUTO-DEPLOY.md) to run the workflow, which tests and builds both
+components, then uses a restricted AWS role to deploy them. Normal development
+stays local; pushing a commit does not deploy.
 
 For `https://health.mckennastuff.com`, follow [CUSTOM-DOMAIN.md](CUSTOM-DOMAIN.md).
 

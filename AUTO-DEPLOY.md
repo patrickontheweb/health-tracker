@@ -1,8 +1,10 @@
-# Automatic deployment from main
+# Manual production deployment
 
-Every push to `main` runs `.github/workflows/deploy.yml`. It tests Angular and the
-Spring Boot API (including DynamoDB Local), builds both, and deploys only after
-the checks pass. Manual runs are also available through the Actions tab on `main`.
+Production deployment runs only when explicitly requested, through the GitHub
+Actions tab on `main`. Pushing a commit does not deploy. Normal changes are built
+and tested locally until the user asks to deploy to production. The workflow
+tests Angular and the Spring Boot API (including DynamoDB Local), builds both,
+and deploys only after the checks pass.
 
 GitHub uses short-lived AWS credentials through OIDC. The AWS trust policy is
 limited to this repository's immutable owner/repository IDs and `main`. This
@@ -24,8 +26,8 @@ No AWS access keys or GitHub personal access token are required by the workflow.
 4. In GitHub **health-tracker → Settings → Secrets and variables → Actions →
    Variables**, create a repository variable named **AWS_DEPLOY_ROLE_ARN**, using
    that ARN as its value. It is a public identifier, so use a variable, not a secret.
-5. In the GitHub Actions tab, run **Test and deploy to AWS** on `main` (or push a
-   new commit). Confirm all steps pass and verify a public read plus a signed-in
+5. When a production deploy is explicitly requested, in the GitHub Actions tab
+   run **Test and deploy to AWS** on `main`. Confirm all steps pass and verify a public read plus a signed-in
    edit in the live site. Until this first real run passes, deployment is unverified.
 
 To push a workflow file using your fine-grained GitHub token, the token needs
@@ -64,8 +66,8 @@ update that modifies Lambda, set that parameter to the **latest successful**
 API and website deployment is not an atomic transaction. If website upload or its
 verification fails after the backend passes, inspect the failed run and rerun it;
 the workflow does not automatically roll the two components back at that point.
-To undo a successful release, revert its source commit on `main`; the normal
-workflow rebuilds and deploys that revert. Stored release artifacts and old hashed
+To undo a successful release, revert its source commit on `main`, then explicitly
+run the workflow to deploy that revert. Stored release artifacts and old hashed
 website assets incur small S3 storage charges; no extra always-running service is
 added. No IAM setup or deployment has occurred merely by adding these files.
 
