@@ -21,6 +21,17 @@ r.WriteRoute={Type:'AWS::ApiGatewayV2::Route',Properties:{ApiId:ref('Api'),Route
 r.ApiPermission={Type:'AWS::Lambda::Permission',Properties:{FunctionName:ref('HabitFunction'),Action:'lambda:InvokeFunction',Principal:'apigateway.amazonaws.com',SourceArn:sub('arn:${AWS::Partition}:execute-api:${AWS::Region}:${AWS::AccountId}:${Api}/*/*/entries*')}};
 template.Parameters.ExistingGitHubOidcProviderArn={Type:'String',Default:'',Description:'Leave blank to create the GitHub OIDC provider. If this account already has one, enter its ARN.'};
 template.Conditions={CreateGitHubProvider:{'Fn::Equals':[ref('ExistingGitHubOidcProviderArn'),'']}};
+template.Parameters.CustomDomainName={Type:'String',Default:'',AllowedValues:['','health.mckennastuff.com'],Description:'Leave blank for the CloudFront address, or use health.mckennastuff.com after certificate validation.'};
+template.Parameters.CustomDomainCertificateArn={Type:'String',Default:'',AllowedPattern:'^$|^arn:aws:acm:us-east-1:[0-9]{12}:certificate/[a-zA-Z0-9-]+$',Description:'Issued ACM certificate ARN in us-east-1 covering the custom domain. Leave blank when not using a custom domain.'};
+template.Conditions.UseCustomDomain={'Fn::Not':[{'Fn::Equals':[ref('CustomDomainName'),'']}]};
+const domainBlank={'Fn::Equals':[ref('CustomDomainName'),'']},certificateBlank={'Fn::Equals':[ref('CustomDomainCertificateArn'),'']};
+template.Rules={DomainAndCertificateTogether:{Assertions:[{Assert:{'Fn::Or':[{'Fn::And':[domainBlank,certificateBlank]},{'Fn::And':[{'Fn::Not':[domainBlank]},{'Fn::Not':[certificateBlank]}]}]},AssertDescription:'Set both the custom domain and certificate ARN, or leave both blank.'}]}};
+const customOrigin=sub('https://${CustomDomainName}');
+const websiteUrl={'Fn::If':['UseCustomDomain',customOrigin,sub('https://${Website.DomainName}')]};
+r.Website.Properties.DistributionConfig.Aliases={'Fn::If':['UseCustomDomain',[ref('CustomDomainName')],ref('AWS::NoValue')]};
+r.Website.Properties.DistributionConfig.ViewerCertificate={'Fn::If':['UseCustomDomain',{AcmCertificateArn:ref('CustomDomainCertificateArn'),SslSupportMethod:'sni-only',MinimumProtocolVersion:'TLSv1.2_2021'},{CloudFrontDefaultCertificate:true}]};
+r.HabitFunction.Properties.Environment.Variables.WEBSITE_ORIGIN=websiteUrl;
+r.Api.Properties.CorsConfiguration.AllowOrigins=[websiteUrl];
 r.GitHubProvider={Type:'AWS::IAM::OIDCProvider',Condition:'CreateGitHubProvider',Properties:{Url:'https://token.actions.githubusercontent.com',ClientIdList:['sts.amazonaws.com']}};
 r.GitHubDeployRole={Type:'AWS::IAM::Role',Properties:{Description:'Deploy only this health tracker from GitHub main',MaxSessionDuration:3600,AssumeRolePolicyDocument:{Version:'2012-10-17',Statement:[{Effect:'Allow',Principal:{Federated:{'Fn::If':['CreateGitHubProvider',ref('GitHubProvider'),ref('ExistingGitHubOidcProviderArn')]}},Action:'sts:AssumeRoleWithWebIdentity',Condition:{StringEquals:{'token.actions.githubusercontent.com:aud':'sts.amazonaws.com','token.actions.githubusercontent.com:sub':'repo:patrickontheweb@10171054/health-tracker@1411953946:ref:refs/heads/main'}}}]},Policies:[{PolicyName:'DeployHealthTracker',PolicyDocument:{Version:'2012-10-17',Statement:[
     {Effect:'Allow',Action:['cloudformation:DescribeStacks'],Resource:sub('arn:${AWS::Partition}:cloudformation:${AWS::Region}:${AWS::AccountId}:stack/${AWS::StackName}/*')},
@@ -30,6 +41,6 @@ r.GitHubDeployRole={Type:'AWS::IAM::Role',Properties:{Description:'Deploy only t
     {Effect:'Allow',Action:['s3:GetObject','s3:PutObject'],Resource:sub('arn:${AWS::Partition}:s3:::${ArtifactBucket}/releases/*')},
     {Effect:'Allow',Action:['cloudfront:CreateInvalidation','cloudfront:GetInvalidation'],Resource:sub('arn:${AWS::Partition}:cloudfront::${AWS::AccountId}:distribution/${Website}')}
 ]}}]}};
-template.Outputs={WebsiteUrl:{Value:sub('https://${Website.DomainName}')},WebsiteBucket:{Value:ref('WebsiteBucket')},ApiUrl:{Value:get('Api','ApiEndpoint')},Region:{Value:ref('AWS::Region')},ClientId:{Value:ref('EditorClient')},UserPoolId:{Value:ref('EditorPool')},DistributionId:{Value:ref('Website')},ApiFunctionName:{Value:ref('HabitFunction')},GitHubDeployRoleArn:{Value:get('GitHubDeployRole','Arn')}};
+template.Outputs={WebsiteUrl:{Value:websiteUrl},CloudFrontDomainName:{Value:get('Website','DomainName')},WebsiteBucket:{Value:ref('WebsiteBucket')},ApiUrl:{Value:get('Api','ApiEndpoint')},Region:{Value:ref('AWS::Region')},ClientId:{Value:ref('EditorClient')},UserPoolId:{Value:ref('EditorPool')},DistributionId:{Value:ref('Website')},ApiFunctionName:{Value:ref('HabitFunction')},GitHubDeployRoleArn:{Value:get('GitHubDeployRole','Arn')}};
 await writeFile(new URL('./template.json',import.meta.url),JSON.stringify(template,null,2)+'\n');
 console.log('Created aws/template.json');

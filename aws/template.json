@@ -15,6 +15,21 @@
       "Type": "String",
       "Default": "",
       "Description": "Leave blank to create the GitHub OIDC provider. If this account already has one, enter its ARN."
+    },
+    "CustomDomainName": {
+      "Type": "String",
+      "Default": "",
+      "AllowedValues": [
+        "",
+        "health.mckennastuff.com"
+      ],
+      "Description": "Leave blank for the CloudFront address, or use health.mckennastuff.com after certificate validation."
+    },
+    "CustomDomainCertificateArn": {
+      "Type": "String",
+      "Default": "",
+      "AllowedPattern": "^$|^arn:aws:acm:us-east-1:[0-9]{12}:certificate/[a-zA-Z0-9-]+$",
+      "Description": "Issued ACM certificate ARN in us-east-1 covering the custom domain. Leave blank when not using a custom domain."
     }
   },
   "Resources": {
@@ -99,7 +114,32 @@
             "MaxTTL": 300
           },
           "ViewerCertificate": {
-            "CloudFrontDefaultCertificate": true
+            "Fn::If": [
+              "UseCustomDomain",
+              {
+                "AcmCertificateArn": {
+                  "Ref": "CustomDomainCertificateArn"
+                },
+                "SslSupportMethod": "sni-only",
+                "MinimumProtocolVersion": "TLSv1.2_2021"
+              },
+              {
+                "CloudFrontDefaultCertificate": true
+              }
+            ]
+          },
+          "Aliases": {
+            "Fn::If": [
+              "UseCustomDomain",
+              [
+                {
+                  "Ref": "CustomDomainName"
+                }
+              ],
+              {
+                "Ref": "AWS::NoValue"
+              }
+            ]
           }
         }
       }
@@ -287,7 +327,15 @@
               "Fn::Sub": "https://cognito-idp.${AWS::Region}.amazonaws.com/${EditorPool}"
             },
             "WEBSITE_ORIGIN": {
-              "Fn::Sub": "https://${Website.DomainName}"
+              "Fn::If": [
+                "UseCustomDomain",
+                {
+                  "Fn::Sub": "https://${CustomDomainName}"
+                },
+                {
+                  "Fn::Sub": "https://${Website.DomainName}"
+                }
+              ]
             }
           }
         }
@@ -312,7 +360,15 @@
         "CorsConfiguration": {
           "AllowOrigins": [
             {
-              "Fn::Sub": "https://${Website.DomainName}"
+              "Fn::If": [
+                "UseCustomDomain",
+                {
+                  "Fn::Sub": "https://${CustomDomainName}"
+                },
+                {
+                  "Fn::Sub": "https://${Website.DomainName}"
+                }
+              ]
             }
           ],
           "AllowMethods": [
@@ -551,7 +607,23 @@
   "Outputs": {
     "WebsiteUrl": {
       "Value": {
-        "Fn::Sub": "https://${Website.DomainName}"
+        "Fn::If": [
+          "UseCustomDomain",
+          {
+            "Fn::Sub": "https://${CustomDomainName}"
+          },
+          {
+            "Fn::Sub": "https://${Website.DomainName}"
+          }
+        ]
+      }
+    },
+    "CloudFrontDomainName": {
+      "Value": {
+        "Fn::GetAtt": [
+          "Website",
+          "DomainName"
+        ]
       }
     },
     "WebsiteBucket": {
@@ -608,6 +680,79 @@
           "Ref": "ExistingGitHubOidcProviderArn"
         },
         ""
+      ]
+    },
+    "UseCustomDomain": {
+      "Fn::Not": [
+        {
+          "Fn::Equals": [
+            {
+              "Ref": "CustomDomainName"
+            },
+            ""
+          ]
+        }
+      ]
+    }
+  },
+  "Rules": {
+    "DomainAndCertificateTogether": {
+      "Assertions": [
+        {
+          "Assert": {
+            "Fn::Or": [
+              {
+                "Fn::And": [
+                  {
+                    "Fn::Equals": [
+                      {
+                        "Ref": "CustomDomainName"
+                      },
+                      ""
+                    ]
+                  },
+                  {
+                    "Fn::Equals": [
+                      {
+                        "Ref": "CustomDomainCertificateArn"
+                      },
+                      ""
+                    ]
+                  }
+                ]
+              },
+              {
+                "Fn::And": [
+                  {
+                    "Fn::Not": [
+                      {
+                        "Fn::Equals": [
+                          {
+                            "Ref": "CustomDomainName"
+                          },
+                          ""
+                        ]
+                      }
+                    ]
+                  },
+                  {
+                    "Fn::Not": [
+                      {
+                        "Fn::Equals": [
+                          {
+                            "Ref": "CustomDomainCertificateArn"
+                          },
+                          ""
+                        ]
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          "AssertDescription": "Set both the custom domain and certificate ARN, or leave both blank."
+        }
       ]
     }
   }
