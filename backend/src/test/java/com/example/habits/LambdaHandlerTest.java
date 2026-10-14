@@ -23,6 +23,6 @@ class LambdaHandlerTest {
             """.formatted(path,query,method,path);
         ByteArrayOutputStream output=new ByteArrayOutputStream();new LambdaHandler().handleRequest(new ByteArrayInputStream(event.getBytes(StandardCharsets.UTF_8)),output,context);return output.toString(StandardCharsets.UTF_8);
     }
-    @Test void publicReadsReachValidationWithoutSignIn() throws Exception {assertTrue(call("GET","/entries","week=invalid").contains("\"statusCode\":400"));}
+    @Test void anonymousPrivateReadsAreBlocked() throws Exception {assertTrue(call("GET","/entries","week=invalid").contains("\"statusCode\":401"));}
     @Test void anonymousWritesAreBlocked() throws Exception {assertTrue(call("PUT","/entries/2026-01-01","").contains("\"statusCode\":401"));}
 }

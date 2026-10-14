@@ -15,10 +15,10 @@ function requireOutput(outputs,key) {
 async function checkApi(apiUrl,fetchHttp) {
   for(let attempt=0;attempt<5;attempt++) {
     try {
-      const response=await fetchHttp(`${apiUrl}/entries?week=2026-01-05`,{signal:AbortSignal.timeout(30000)});
+      const response=await fetchHttp(`${apiUrl}/health`,{signal:AbortSignal.timeout(30000)});
       if(!response.ok) throw new Error(`HTTP ${response.status}`);
       const body=await response.json();
-      if(!body.entries || typeof body.entries!=='object' || Array.isArray(body.entries)) throw new Error('Invalid API response');
+      if(body.status!=='ok') throw new Error('Invalid API response');
       return;
     } catch(error) {
       if(attempt===4) throw new Error(`API smoke check failed: ${error.message}`);
@@ -38,6 +38,8 @@ const description=json('cloudformation','describe-stacks','--stack-name',stack).
 if(!['CREATE_COMPLETE','UPDATE_COMPLETE','UPDATE_ROLLBACK_COMPLETE'].includes(description.StackStatus)) throw new Error('Wait for the AWS stack operation to finish before deploying');
 if(description.Parameters.find(p=>p.ParameterKey==='ArtifactBucket')?.ParameterValue!==bucket) throw new Error('Artifact bucket does not match the AWS stack');
 const outputs=description.Outputs;
+if(requireOutput(outputs,'RecordsMode')!=='per-user-v1')throw new Error('Update the stack for per-user records before deploying');
+if(!description.Parameters.find(p=>p.ParameterKey==='LegacyLogOwnerSub')?.ParameterValue)throw new Error('Set LegacyLogOwnerSub to preserve the existing log under its owner account before deploying');
 const functionName=requireOutput(outputs,'ApiFunctionName'),websiteBucket=requireOutput(outputs,'WebsiteBucket');
 const distribution=requireOutput(outputs,'DistributionId'),apiUrl=requireOutput(outputs,'ApiUrl');
 const websiteUrl=requireOutput(outputs,'WebsiteUrl'),clientId=requireOutput(outputs,'ClientId');

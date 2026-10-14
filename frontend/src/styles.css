@@ -52,3 +52,41 @@ footer{text-align:right;border-top:0}
 @media(max-width:520px){.calendar-grid{grid-template-columns:repeat(7,minmax(0,1fr)) 24px}.calendar-week-summary{padding:5px 0}.calendar-week-summary>div.weekly-metric{justify-content:center}.calendar-week-summary .weekly-metric strong{display:none}}
 
 .panel.log,.panel.calendar{background:#faf7f0}
+
+.produce-icons{grid-template-columns:repeat(6,minmax(0,1fr))}.produce-add span{filter:none;opacity:1;color:#087768}.produce-field .produce-icons{max-width:408px}
+
+.calendar-food>small{margin-left:2px}
+
+.weight-field{grid-column:1;max-width:110px}#weight{width:100px;text-align:right}
+
+.calendar-day .calendar-weight{font-size:.75rem;line-height:1;color:#596880}@media(max-width:520px){.calendar-day .calendar-weight{font-size:.55rem}}
+
+.log-heading .weight-field{width:100px;flex-shrink:0}.log-heading .weight-field label{min-height:0;margin:0 0 4px}.log-heading .date-field{align-self:flex-end}
+
+.produce-field .produce-heading{max-width:408px}
+
+.log-heading .date-field>label{margin-bottom:4px}
+
+.measurements-row{display:flex;align-items:flex-end;gap:18px;flex-wrap:wrap;margin-bottom:22px}.measurements-row .weight-field label{margin-bottom:10px}
+
+#weight{appearance:auto}#weight::-webkit-inner-spin-button{opacity:1;cursor:pointer}
+
+.log-heading .date-field{width:160px;max-width:160px}
+
+.log-export{gap:18px}
+
+.log-account{color:#64718a;font-size:.875rem}
+
+@media(max-width:520px){.daily-edit{grid-template-columns:100px minmax(64px,1fr)}.lift-field{max-width:64px}}
+
+.measurements-row,.nutrition-row{display:flex;align-items:flex-end;gap:18px;flex-wrap:wrap;margin-bottom:22px}.measurement-number{width:110px;text-align:right;appearance:auto}.measurement-number::-webkit-inner-spin-button,.bp-inputs input::-webkit-inner-spin-button{opacity:1}.bp-inputs{display:flex;align-items:center;gap:6px}.bp-inputs input{width:85px;text-align:right}.bp-inputs span{color:#64718a}.nutrition-row .log-field>label{margin-bottom:10px}
+
+.details-toggle{margin-top:18px}.measurement-details{margin-top:20px}.measurement-details .nutrition-row{margin-bottom:0}
+
+.details-toggle{text-decoration:none}
+
+.details-toggle{display:block;margin:18px auto 0;font-size:1.8rem;line-height:1;padding:4px 16px;text-decoration:none}
+
+.details-toggle{width:44px;height:32px;display:flex;align-items:center;justify-content:center;padding:0;border:1px solid #deded8;border-radius:10px;background:#f2f0e9;color:#64718a}.details-toggle:hover{background:#e9e7df;color:#1650d8;border-color:#bdc8d8}.details-toggle svg{width:22px;height:22px}.details-toggle svg.details-expanded{transform:rotate(180deg)}@media(prefers-reduced-motion:no-preference){.details-toggle svg{transition:transform .18s ease}}
+
+.panel.log{padding-bottom:14px}.measurement-details{margin-top:12px}

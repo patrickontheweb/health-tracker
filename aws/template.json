@@ -1,6 +1,6 @@
 {
   "AWSTemplateFormatVersion": "2010-09-09",
-  "Description": "Health habits: Angular on S3/CloudFront, Spring Boot Lambda API, public reads, Cognito-protected writes.",
+  "Description": "Health habits: Angular on S3/CloudFront, Spring Boot Lambda API, Cognito-protected per-user records.",
   "Parameters": {
     "ArtifactBucket": {
       "Type": "String",
@@ -10,6 +10,18 @@
       "Type": "String",
       "Default": "health-habits-api-lambda.jar",
       "Description": "S3 object key of the uploaded Lambda JAR"
+    },
+    "LegacyLogOwnerSub": {
+      "Type": "String",
+      "Default": "",
+      "AllowedPattern": "^$|^[a-zA-Z0-9_-]{1,128}$",
+      "Description": "Existing log owner Cognito sub. Original legacy data is retained."
+    },
+    "LegacyLogOwnerUsername": {
+      "Type": "String",
+      "Default": "pcmckenna",
+      "AllowedPattern": "^[a-z0-9][a-z0-9_-]{0,63}$",
+      "Description": "Public username of the existing log owner."
     },
     "ExistingGitHubOidcProviderArn": {
       "Type": "String",
@@ -129,6 +141,20 @@
               }
             ]
           },
+          "CustomErrorResponses": [
+            {
+              "ErrorCode": 403,
+              "ResponseCode": 200,
+              "ResponsePagePath": "/index.html",
+              "ErrorCachingMinTTL": 0
+            },
+            {
+              "ErrorCode": 404,
+              "ResponseCode": 200,
+              "ResponsePagePath": "/index.html",
+              "ErrorCachingMinTTL": 0
+            }
+          ],
           "Aliases": {
             "Fn::If": [
               "UseCustomDomain",
@@ -337,6 +363,19 @@
                   "Fn::Sub": "https://${Website.DomainName}"
                 }
               ]
+            },
+            "LOG_OWNER_SUB": {
+              "Ref": "LegacyLogOwnerSub"
+            },
+            "LOG_OWNER_USERNAME": {
+              "Ref": "LegacyLogOwnerUsername"
+            },
+            "MIGRATE_LEGACY_LOG": {
+              "Fn::If": [
+                "HasLegacyOwner",
+                "true",
+                "false"
+              ]
             }
           }
         }
@@ -445,7 +484,13 @@
           "Ref": "Api"
         },
         "RouteKey": "GET /entries",
-        "AuthorizationType": "NONE",
+        "AuthorizationType": "JWT",
+        "AuthorizerId": {
+          "Ref": "Authorizer"
+        },
+        "AuthorizationScopes": [
+          "aws.cognito.signin.user.admin"
+        ],
         "Target": {
           "Fn::Sub": "integrations/${Integration}"
         }
@@ -479,7 +524,52 @@
         "Action": "lambda:InvokeFunction",
         "Principal": "apigateway.amazonaws.com",
         "SourceArn": {
-          "Fn::Sub": "arn:${AWS::Partition}:execute-api:${AWS::Region}:${AWS::AccountId}:${Api}/*/*/entries*"
+          "Fn::Sub": "arn:${AWS::Partition}:execute-api:${AWS::Region}:${AWS::AccountId}:${Api}/*/*/*"
+        }
+      }
+    },
+    "HealthRoute": {
+      "Type": "AWS::ApiGatewayV2::Route",
+      "Properties": {
+        "ApiId": {
+          "Ref": "Api"
+        },
+        "RouteKey": "GET /health",
+        "AuthorizationType": "NONE",
+        "Target": {
+          "Fn::Sub": "integrations/${Integration}"
+        }
+      }
+    },
+    "ProfileRoute": {
+      "Type": "AWS::ApiGatewayV2::Route",
+      "Properties": {
+        "ApiId": {
+          "Ref": "Api"
+        },
+        "RouteKey": "GET /me/profile",
+        "AuthorizationType": "JWT",
+        "AuthorizerId": {
+          "Ref": "Authorizer"
+        },
+        "AuthorizationScopes": [
+          "aws.cognito.signin.user.admin"
+        ],
+        "Target": {
+          "Fn::Sub": "integrations/${Integration}"
+        }
+      }
+    },
+    "PublicReadRoute": {
+      "Type": "AWS::ApiGatewayV2::Route",
+      "Properties": {
+        "ApiId": {
+          "Ref": "Api"
+        },
+        "RouteKey": "GET /users/{username}/entries",
+        "AuthorizationType": "NONE",
+        "Target": {
+          "Fn::Sub": "integrations/${Integration}"
         }
       }
     },
@@ -672,9 +762,24 @@
           "Arn"
         ]
       }
+    },
+    "RecordsMode": {
+      "Value": "per-user-v1"
     }
   },
   "Conditions": {
+    "HasLegacyOwner": {
+      "Fn::Not": [
+        {
+          "Fn::Equals": [
+            {
+              "Ref": "LegacyLogOwnerSub"
+            },
+            ""
+          ]
+        }
+      ]
+    },
     "CreateGitHubProvider": {
       "Fn::Equals": [
         {

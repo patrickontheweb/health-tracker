@@ -1,6 +1,6 @@
 import {writeFile} from 'node:fs/promises';
 const ref=name=>({Ref:name}),get=(name,attribute)=>({'Fn::GetAtt':[name,attribute]}),sub=text=>({'Fn::Sub':text});
-const template={AWSTemplateFormatVersion:'2010-09-09',Description:'Health habits: Angular on S3/CloudFront, Spring Boot Lambda API, public reads, Cognito-protected writes.',Parameters:{ArtifactBucket:{Type:'String',Description:'Existing private S3 bucket in this region containing the Spring Boot Lambda JAR'},ArtifactKey:{Type:'String',Default:'health-habits-api-lambda.jar',Description:'S3 object key of the uploaded Lambda JAR'}},Resources:{},Outputs:{}};
+const template={AWSTemplateFormatVersion:'2010-09-09',Description:'Health habits: Angular on S3/CloudFront, Spring Boot Lambda API, Cognito-protected per-user records.',Parameters:{ArtifactBucket:{Type:'String',Description:'Existing private S3 bucket in this region containing the Spring Boot Lambda JAR'},ArtifactKey:{Type:'String',Default:'health-habits-api-lambda.jar',Description:'S3 object key of the uploaded Lambda JAR'}},Resources:{},Outputs:{}};
 const r=template.Resources;
 r.WebsiteBucket={Type:'AWS::S3::Bucket',Properties:{PublicAccessBlockConfiguration:{BlockPublicAcls:true,BlockPublicPolicy:true,IgnorePublicAcls:true,RestrictPublicBuckets:true},BucketEncryption:{ServerSideEncryptionConfiguration:[{ServerSideEncryptionByDefault:{SSEAlgorithm:'AES256'}}]}}};
 r.OriginAccess={Type:'AWS::CloudFront::OriginAccessControl',Properties:{OriginAccessControlConfig:{Name:sub('${AWS::StackName}-s3'),OriginAccessControlOriginType:'s3',SigningBehavior:'always',SigningProtocol:'sigv4'}}};
@@ -16,11 +16,20 @@ r.Api={Type:'AWS::ApiGatewayV2::Api',Properties:{Name:sub('${AWS::StackName}-api
 r.ApiStage={Type:'AWS::ApiGatewayV2::Stage',Properties:{ApiId:ref('Api'),StageName:'$default',AutoDeploy:true,DefaultRouteSettings:{ThrottlingBurstLimit:20,ThrottlingRateLimit:10}}};
 r.Integration={Type:'AWS::ApiGatewayV2::Integration',Properties:{ApiId:ref('Api'),IntegrationType:'AWS_PROXY',IntegrationUri:get('HabitFunction','Arn'),PayloadFormatVersion:'2.0',TimeoutInMillis:30000}};
 r.Authorizer={Type:'AWS::ApiGatewayV2::Authorizer',Properties:{ApiId:ref('Api'),Name:'EditorSignIn',AuthorizerType:'JWT',IdentitySource:['$request.header.Authorization'],JwtConfiguration:{Audience:[ref('EditorClient')],Issuer:sub('https://cognito-idp.${AWS::Region}.amazonaws.com/${EditorPool}')}}};
-r.ReadRoute={Type:'AWS::ApiGatewayV2::Route',Properties:{ApiId:ref('Api'),RouteKey:'GET /entries',AuthorizationType:'NONE',Target:sub('integrations/${Integration}')}};
+r.ReadRoute={Type:'AWS::ApiGatewayV2::Route',Properties:{ApiId:ref('Api'),RouteKey:'GET /entries',AuthorizationType:'JWT',AuthorizerId:ref('Authorizer'),AuthorizationScopes:['aws.cognito.signin.user.admin'],Target:sub('integrations/${Integration}')}};
 r.WriteRoute={Type:'AWS::ApiGatewayV2::Route',Properties:{ApiId:ref('Api'),RouteKey:'PUT /entries/{day}',AuthorizationType:'JWT',AuthorizerId:ref('Authorizer'),AuthorizationScopes:['aws.cognito.signin.user.admin'],Target:sub('integrations/${Integration}')}};
-r.ApiPermission={Type:'AWS::Lambda::Permission',Properties:{FunctionName:ref('HabitFunction'),Action:'lambda:InvokeFunction',Principal:'apigateway.amazonaws.com',SourceArn:sub('arn:${AWS::Partition}:execute-api:${AWS::Region}:${AWS::AccountId}:${Api}/*/*/entries*')}};
+r.ApiPermission={Type:'AWS::Lambda::Permission',Properties:{FunctionName:ref('HabitFunction'),Action:'lambda:InvokeFunction',Principal:'apigateway.amazonaws.com',SourceArn:sub('arn:${AWS::Partition}:execute-api:${AWS::Region}:${AWS::AccountId}:${Api}/*/*/*')}};
+r.HealthRoute={Type:'AWS::ApiGatewayV2::Route',Properties:{ApiId:ref('Api'),RouteKey:'GET /health',AuthorizationType:'NONE',Target:sub('integrations/${Integration}')}};
+r.ProfileRoute={Type:'AWS::ApiGatewayV2::Route',Properties:{ApiId:ref('Api'),RouteKey:'GET /me/profile',AuthorizationType:'JWT',AuthorizerId:ref('Authorizer'),AuthorizationScopes:['aws.cognito.signin.user.admin'],Target:sub('integrations/${Integration}')}};
+r.PublicReadRoute={Type:'AWS::ApiGatewayV2::Route',Properties:{ApiId:ref('Api'),RouteKey:'GET /users/{username}/entries',AuthorizationType:'NONE',Target:sub('integrations/${Integration}')}};
+r.Website.Properties.DistributionConfig.CustomErrorResponses=[{ErrorCode:403,ResponseCode:200,ResponsePagePath:'/index.html',ErrorCachingMinTTL:0},{ErrorCode:404,ResponseCode:200,ResponsePagePath:'/index.html',ErrorCachingMinTTL:0}];
+template.Parameters.LegacyLogOwnerSub={Type:'String',Default:'',AllowedPattern:'^$|^[a-zA-Z0-9_-]{1,128}$',Description:'Existing log owner Cognito sub. Original legacy data is retained.'};
+template.Parameters.LegacyLogOwnerUsername={Type:'String',Default:'pcmckenna',AllowedPattern:'^[a-z0-9][a-z0-9_-]{0,63}$',Description:'Public username of the existing log owner.'};
+r.HabitFunction.Properties.Environment.Variables.LOG_OWNER_SUB=ref('LegacyLogOwnerSub');
+r.HabitFunction.Properties.Environment.Variables.LOG_OWNER_USERNAME=ref('LegacyLogOwnerUsername');
+r.HabitFunction.Properties.Environment.Variables.MIGRATE_LEGACY_LOG={'Fn::If':['HasLegacyOwner','true','false']};
 template.Parameters.ExistingGitHubOidcProviderArn={Type:'String',Default:'',Description:'Leave blank to create the GitHub OIDC provider. If this account already has one, enter its ARN.'};
-template.Conditions={CreateGitHubProvider:{'Fn::Equals':[ref('ExistingGitHubOidcProviderArn'),'']}};
+template.Conditions={HasLegacyOwner:{'Fn::Not':[{'Fn::Equals':[ref('LegacyLogOwnerSub'),'']}]},CreateGitHubProvider:{'Fn::Equals':[ref('ExistingGitHubOidcProviderArn'),'']}};
 template.Parameters.CustomDomainName={Type:'String',Default:'',AllowedValues:['','health.mckennastuff.com','lifestylerx.org'],Description:'Leave blank for the CloudFront address, or use health.mckennastuff.com or lifestylerx.org after certificate validation.'};
 template.Parameters.CustomDomainCertificateArn={Type:'String',Default:'',AllowedPattern:'^$|^arn:aws:acm:us-east-1:[0-9]{12}:certificate/[a-zA-Z0-9-]+$',Description:'Issued ACM certificate ARN in us-east-1 covering the custom domain. Leave blank when not using a custom domain.'};
 template.Conditions.UseCustomDomain={'Fn::Not':[{'Fn::Equals':[ref('CustomDomainName'),'']}]};
@@ -42,5 +51,6 @@ r.GitHubDeployRole={Type:'AWS::IAM::Role',Properties:{Description:'Deploy only t
     {Effect:'Allow',Action:['cloudfront:CreateInvalidation','cloudfront:GetInvalidation'],Resource:sub('arn:${AWS::Partition}:cloudfront::${AWS::AccountId}:distribution/${Website}')}
 ]}}]}};
 template.Outputs={WebsiteUrl:{Value:websiteUrl},CloudFrontDomainName:{Value:get('Website','DomainName')},WebsiteBucket:{Value:ref('WebsiteBucket')},ApiUrl:{Value:get('Api','ApiEndpoint')},Region:{Value:ref('AWS::Region')},ClientId:{Value:ref('EditorClient')},UserPoolId:{Value:ref('EditorPool')},DistributionId:{Value:ref('Website')},ApiFunctionName:{Value:ref('HabitFunction')},GitHubDeployRoleArn:{Value:get('GitHubDeployRole','Arn')}};
+template.Outputs.RecordsMode={Value:'per-user-v1'};
 await writeFile(new URL('./template.json',import.meta.url),JSON.stringify(template,null,2)+'\n');
 console.log('Created aws/template.json');

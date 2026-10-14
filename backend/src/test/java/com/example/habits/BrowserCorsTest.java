@@ -16,18 +16,18 @@ import static org.mockito.Mockito.when;
 
 @SpringBootTest(webEnvironment=SpringBootTest.WebEnvironment.RANDOM_PORT,properties={
     "habits.issuer=https://example.com/pool","habits.client-id=test-client",
-    "habits.origin=http://127.0.0.1:4200","habits.local=false"})
+    "habits.origin=http://127.0.0.1:4200","habits.local=false","habits.owner-sub=test-user"})
 class BrowserCorsTest {
     @Value("${local.server.port}") int port;
     @MockitoBean EntryRepository repository;
     final HttpClient browser=HttpClient.newHttpClient();
-    @BeforeEach void prepare() { when(repository.week(anyString(),anyString())).thenReturn(Map.of()); }
-    @Test void localBrowserCanLoadHistory() throws Exception {
+    @BeforeEach void prepare() { when(repository.weekForUser(anyString(),anyString(),anyString())).thenReturn(Map.of()); }
+    @Test void anonymousBrowserCannotLoadHistory() throws Exception {
         var response=browser.send(HttpRequest.newBuilder(URI.create("http://127.0.0.1:"+port+"/entries?week=2026-10-12"))
             .header("Origin","http://127.0.0.1:4200").GET().build(),HttpResponse.BodyHandlers.ofString());
-        assertEquals(200,response.statusCode());
+        assertEquals(401,response.statusCode());
         assertEquals("http://127.0.0.1:4200",response.headers().firstValue("Access-Control-Allow-Origin").orElse(""));
-        assertTrue(response.body().contains("entries"));
+        assertFalse(response.body().contains("entries"));
     }
     @Test void savePreflightAllowsAuthorizationHeader() throws Exception {
         var response=browser.send(HttpRequest.newBuilder(URI.create("http://127.0.0.1:"+port+"/entries/2026-10-13"))

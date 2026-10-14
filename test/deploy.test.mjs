@@ -9,10 +9,10 @@ async function fixture({failUpdate=false,stackStatus='UPDATE_COMPLETE'}={}) {
   const dir=await mkdtemp(join(tmpdir(),'health-deploy-test-')),site=join(dir,'site'),jar=join(dir,'api.jar');
   await mkdir(site);await writeFile(join(site,'index.html'),'<html>new website</html>');await writeFile(jar,'fake-jar');
   const calls=[],env={GITHUB_SHA:'a'.repeat(40),GITHUB_RUN_ID:'123',GITHUB_RUN_ATTEMPT:'1',AWS_STACK_NAME:'health-habits',AWS_ARTIFACT_BUCKET:'pcmckenna-health',AWS_REGION:'us-east-1'};
-  const values={ApiFunctionName:'habits-api',WebsiteBucket:'habits-website',DistributionId:'DIST123',ApiUrl:'https://api.example',WebsiteUrl:'https://site.example',ClientId:'client123',Region:'us-east-1'};
+  const values={RecordsMode:'per-user-v1',ApiFunctionName:'habits-api',WebsiteBucket:'habits-website',DistributionId:'DIST123',ApiUrl:'https://api.example',WebsiteUrl:'https://site.example',ClientId:'client123',Region:'us-east-1'};
   const invokeAws=(...args)=> {
     calls.push(args);
-    if(args[0]==='cloudformation') return JSON.stringify({Stacks:[{StackStatus:stackStatus,Parameters:[{ParameterKey:'ArtifactBucket',ParameterValue:'pcmckenna-health'}],Outputs:Object.entries(values).map(([OutputKey,OutputValue])=>({OutputKey,OutputValue}))}]});
+    if(args[0]==='cloudformation') return JSON.stringify({Stacks:[{StackStatus:stackStatus,Parameters:[{ParameterKey:'ArtifactBucket',ParameterValue:'pcmckenna-health'},{ParameterKey:'LegacyLogOwnerSub',ParameterValue:'owner-sub'}],Outputs:Object.entries(values).map(([OutputKey,OutputValue])=>({OutputKey,OutputValue}))}]});
     if(args[1]==='get-function') return JSON.stringify({Code:{Location:'https://code.example'},Configuration:{RevisionId:'old-revision'}});
     if(args[1]==='get-function-configuration') return JSON.stringify({RevisionId:'new-revision'});
     if(args[1]==='update-function-code' && failUpdate && args.includes(`releases/${env.GITHUB_SHA}/123-1/api.jar`)) throw new Error('Simulated update failure');
@@ -21,7 +21,7 @@ async function fixture({failUpdate=false,stackStatus='UPDATE_COMPLETE'}={}) {
   };
   const fetchHttp=async url=> {
     if(url==='https://code.example') return new Response('previous-jar');
-    if(url.startsWith('https://api.example/entries')) return Response.json({entries:{}});
+    if(url==='https://api.example/health') return Response.json({status:'ok'});
     if(url==='https://site.example') return new Response('<html>new website</html>');
     throw new Error('Unexpected network request');
   };
@@ -49,4 +49,9 @@ test('an in-progress stack operation prevents any deployment writes',async()=> {
 });
 test('wrong deployment target is rejected before contacting AWS',async()=> {
   const f=await fixture();f.env.AWS_ARTIFACT_BUCKET='wrong-bucket';await assert.rejects(deploy(f),/Unexpected deployment target/);assert.equal(f.calls.length,0);
+});
+test('missing legacy owner prevents deployment writes',async()=>{
+  const f=await fixture(),original=f.invokeAws;
+  f.invokeAws=(...args)=>{const response=original(...args);if(args[0]!=='cloudformation')return response;const body=JSON.parse(response);body.Stacks[0].Parameters=body.Stacks[0].Parameters.filter(p=>p.ParameterKey!=='LegacyLogOwnerSub');return JSON.stringify(body);};
+  await assert.rejects(deploy(f),/Set LegacyLogOwnerSub/);assert.deepEqual(f.calls.map(a=>a[0]),['cloudformation']);
 });

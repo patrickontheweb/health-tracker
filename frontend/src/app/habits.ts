@@ -1,4 +1,13 @@
-export interface Entry {cardio:number;lifting:number;produce:number;revision:number;}
+export interface Entry {cardio:number;lifting:number;produce:number;revision:number;weight?:number|null;systolic?:number|null;diastolic?:number|null;heartRate?:number|null;sleepHours?:number|null;calories?:number|null;sugarGrams?:number|null;saturatedFatGrams?:number|null;sodiumMg?:number|null;}
+export type Measurement='weight'|'systolic'|'diastolic'|'heartRate'|'sleepHours'|'calories'|'sugarGrams'|'saturatedFatGrams'|'sodiumMg';
+export function userPage(path:string){
+  const parts=path.split('/').filter(Boolean).map(decodeURIComponent);
+  if(!parts.length)return {username:null,date:null};
+  if(parts.length>2||! /^[a-z0-9][a-z0-9_-]{0,63}$/i.test(parts[0]))throw new Error('Invalid user URL.');
+  let date:string|null=null;
+  if(parts[1]){if(!/^\d{8}$/.test(parts[1]))throw new Error('Use MMDDYYYY in the URL.');date=`${parts[1].slice(4)}-${parts[1].slice(0,2)}-${parts[1].slice(2,4)}`;parseDate(date);}
+  return {username:parts[0].toLowerCase(),date};
+}
 export type Entries=Record<string,Entry>;
 export function monthGrid(month:string):(string|null)[]{const first=parseDate(`${month}-01`),offset=(first.getDay()+6)%7,last=new Date(first.getFullYear(),first.getMonth()+1,0,12).getDate();return Array.from({length:Math.ceil((offset+last)/7)*7},(_,i)=>i<offset||i>=offset+last?null:`${month}-${String(i-offset+1).padStart(2,'0')}`);}
 export function monthRows(month:string):{week:string;days:(string|null)[]}[]{const days=monthGrid(month);return Array.from({length:days.length/7},(_,index)=>{const row=days.slice(index*7,index*7+7);return {week:weekKeys(row.find((day):day is string=>day!==null)!)[0],days:row};});}

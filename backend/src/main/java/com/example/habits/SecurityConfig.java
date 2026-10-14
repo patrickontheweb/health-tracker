@@ -37,7 +37,11 @@ public class SecurityConfig {
         return http.csrf(csrf -> csrf.disable()).cors(cors -> cors.configurationSource(source))
             .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
             .authorizeHttpRequests(auth -> auth
-                .requestMatchers(HttpMethod.GET, "/entries").permitAll()
+                .requestMatchers(HttpMethod.GET, "/health").permitAll()
+                .requestMatchers(HttpMethod.GET,"/users/*/entries").permitAll()
+                .requestMatchers(HttpMethod.GET, "/entries").hasAuthority("SCOPE_aws.cognito.signin.user.admin")
+
+                .requestMatchers("/me/**").hasAuthority("SCOPE_aws.cognito.signin.user.admin")
                 .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                 .requestMatchers(HttpMethod.POST,"/dev/login").access((authentication,context)->new org.springframework.security.authorization.AuthorizationDecision(development.getIfAvailable()!=null))
                 .requestMatchers(HttpMethod.PUT, "/entries/*").hasAuthority("SCOPE_aws.cognito.signin.user.admin")
@@ -47,7 +51,7 @@ public class SecurityConfig {
     @Bean CorsConfigurationSource corsConfigurationSource(@Value("${habits.origin}") String origin,
         org.springframework.beans.factory.ObjectProvider<DevLoginController> development) {
         CorsConfiguration config = new CorsConfiguration();
-        config.setAllowedOrigins(List.of(origin));config.setAllowedMethods(development.getIfAvailable()==null?List.of("GET", "PUT", "OPTIONS"):List.of("GET", "PUT", "POST", "OPTIONS"));
+        config.setAllowedOrigins(List.of(origin));config.setAllowedMethods(List.of("GET","PUT","POST","DELETE","OPTIONS"));
         config.setAllowedHeaders(List.of("Content-Type", "Authorization"));
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();source.registerCorsConfiguration("/**", config);return source;
     }
