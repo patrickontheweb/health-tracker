@@ -12,7 +12,7 @@ async function fixture(){
   await writeFile(templatePath,JSON.stringify({Parameters:{ArtifactBucket:{Type:'String'},ArtifactKey:{Type:'String'},CustomDomainName:{Type:'String'},NewDefault:{Type:'String',Default:''}}}));
   const env={GITHUB_SHA:sha,GITHUB_RUN_ID:'123',GITHUB_RUN_ATTEMPT:'1',AWS_STACK_NAME:'health-habits',AWS_REGION:'us-east-1',AWS_ARTIFACT_BUCKET:'pcmckenna-health',INFRA_OPERATION:'preview'};
   const calls=[],stack={StackId:'stack-id',StackStatus:'UPDATE_COMPLETE',Parameters:[{ParameterKey:'ArtifactBucket',ParameterValue:'pcmckenna-health'},{ParameterKey:'ArtifactKey',ParameterValue:'old.jar'},{ParameterKey:'CustomDomainName',ParameterValue:'lifestylerx.org'}],Outputs:[{OutputKey:'CloudFormationRoleArn',OutputValue:role},{OutputKey:'ApiFunctionName',OutputValue:'function-name'}]};
-  const plan={StackId:'stack-id',RoleARN:role,Status:'CREATE_COMPLETE',ExecutionStatus:'AVAILABLE',Description:JSON.stringify({commit:sha,codeSha}),Changes:[{ResourceChange:{Action:'Modify',LogicalResourceId:'Website',ResourceType:'AWS::CloudFront::Distribution',Replacement:'False'}}]};
+  const plan={StackId:'stack-id',Status:'CREATE_COMPLETE',ExecutionStatus:'AVAILABLE',Description:JSON.stringify({commit:sha,codeSha,role}),Changes:[{ResourceChange:{Action:'Modify',LogicalResourceId:'Website',ResourceType:'AWS::CloudFront::Distribution',Replacement:'False'}}]};
   const live={Configuration:{CodeSha256:codeSha},Code:{Location:'https://signed.example/package'}};
   const aws=(...args)=>{calls.push(args);if(args[1]==='describe-stacks')return JSON.stringify({Stacks:[stack]});if(args[1]==='describe-change-set')return JSON.stringify(plan);if(args[1]==='get-function')return JSON.stringify(live);return '{}';};
   return {env,aws,fetchHttp:async()=>new Response(code),templatePath,calls,plan,live,stack};
@@ -40,7 +40,7 @@ test('wrong target fails before AWS calls and new required parameters fail clear
   assert.throws(()=>previousParameters({Parameters:{Required:{Type:'String'}}},[],'code.jar'),/New parameter/);
 });
 test('unexpected role or stack blocks applying a plan',async()=>{
-  for(const key of ['StackId','RoleARN']){const f=await fixture();f.env.INFRA_OPERATION='apply';f.env.INFRA_CHANGE_SET='lifestylerx-aaaaaaaaaaaa-123-1';f.plan[key]='other';await assert.rejects(infrastructure(f));assert.ok(!f.calls.some(a=>a[1]==='execute-change-set'));}
+  for(const key of ['stack','role']){const f=await fixture();f.env.INFRA_OPERATION='apply';f.env.INFRA_CHANGE_SET='lifestylerx-aaaaaaaaaaaa-123-1';if(key==='stack')f.plan.StackId='other';else f.plan.Description=JSON.stringify({...JSON.parse(f.plan.Description),role:'other'});await assert.rejects(infrastructure(f));assert.ok(!f.calls.some(a=>a[1]==='execute-change-set'));}
 });
 test('template grants item lookup to the app and limits pass-role to the intended services',async()=>{
   const template=JSON.parse(await readFile(new URL('../aws/template.json',import.meta.url),'utf8'));

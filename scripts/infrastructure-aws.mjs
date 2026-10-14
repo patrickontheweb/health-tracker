@@ -40,7 +40,9 @@ export async function infrastructure({env=process.env,aws=runAws,fetchHttp=fetch
     if(plan.StackId!==stack.StackId||plan.Status!=='CREATE_COMPLETE'||plan.ExecutionStatus!=='AVAILABLE')throw new Error('Change set is not available for this stack');
     const metadata=JSON.parse(plan.Description);
     if(metadata.commit!==sha)throw new Error('Main changed since this preview; create a new preview');
-    if(plan.RoleARN!==role)throw new Error('Unexpected CloudFormation execution role');
+    // DescribeChangeSet does not return RoleARN. Record the explicit role passed
+    // to CreateChangeSet in the preview metadata and compare it to stack outputs.
+    if(metadata.role!==role)throw new Error('Unexpected CloudFormation execution role');
     checkChanges(plan.Changes??[]);
     const live=json('lambda','get-function','--function-name',functionName);
     if(live.Configuration.CodeSha256!==metadata.codeSha)throw new Error('Application code changed since preview; create a new preview');
@@ -63,7 +65,7 @@ export async function infrastructure({env=process.env,aws=runAws,fetchHttp=fetch
   await writeFile(jar,bytes);await writeFile(parameters,JSON.stringify(previousParameters(template,stack.Parameters,artifactKey)));
   aws('s3','cp',jar,`s3://pcmckenna-health/${artifactKey}`);
   const name=`lifestylerx-${sha.slice(0,12)}-${run}-${attempt}`;
-  aws('cloudformation','create-change-set','--stack-name','health-habits','--change-set-name',name,'--change-set-type','UPDATE','--template-body',`file://${resolve(templatePath)}`,'--parameters',`file://${parameters}`,'--role-arn',role,'--capabilities','CAPABILITY_IAM','--description',JSON.stringify({commit:sha,codeSha:live.Configuration.CodeSha256}));
+  aws('cloudformation','create-change-set','--stack-name','health-habits','--change-set-name',name,'--change-set-type','UPDATE','--template-body',`file://${resolve(templatePath)}`,'--parameters',`file://${parameters}`,'--role-arn',role,'--capabilities','CAPABILITY_IAM','--description',JSON.stringify({commit:sha,codeSha:live.Configuration.CodeSha256,role}));
   try{aws('cloudformation','wait','change-set-create-complete','--stack-name','health-habits','--change-set-name',name);}catch{
     const failed=json('cloudformation','describe-change-set','--stack-name','health-habits','--change-set-name',name);
     if(/didn.t contain changes|No updates are to be performed/i.test(failed.StatusReason??'')){await summary('No infrastructure changes.');return {applied:false,noChanges:true};}
