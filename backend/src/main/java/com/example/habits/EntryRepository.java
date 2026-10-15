@@ -9,4 +9,6 @@ public interface EntryRepository {
     Entry saveMeasurements(String user,String day,Entry entry,long expectedRevision);
     String publicUser(String username);
     void ensureProfile(String user,String username);
+    Goals goals(String user);
+    Goals saveGoals(String user,Goals goals);
 }

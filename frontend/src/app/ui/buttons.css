@@ -1,0 +1,70 @@
+/* Application action controls. Change shared appearance here, not in page CSS. */
+:root {
+  --rx-button-radius: 7px;
+  --rx-button-primary-radius: var(--rx-button-radius);
+  --rx-button-secondary-radius: var(--rx-button-radius);
+  --rx-button-destructive-radius: var(--rx-button-radius);
+  --rx-button-primary: #1650d8;
+  --rx-button-primary-hover: #123faf;
+  --rx-button-secondary: #edf3ff;
+  --rx-button-secondary-hover: #e0eaff;
+  --rx-button-secondary-text: #234c91;
+  --rx-button-secondary-border: #cbd9f3;
+  --rx-button-destructive: #b42332;
+  --rx-button-destructive-hover: #8f1c28;
+  --rx-button-focus: #1650d8;
+}
+
+button.rx-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 44px;
+  padding: 10px 16px;
+  border: 1px solid transparent;
+  font: inherit;
+  font-size: .875rem;
+  font-weight: 650;
+  line-height: 1.25;
+  text-align: center;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+button.rx-button[data-variant='primary'] {
+  border-radius: var(--rx-button-primary-radius);
+  background: var(--rx-button-primary);
+  color: #fff;
+}
+button.rx-button[data-variant='primary']:hover:not(:disabled) {
+  background: var(--rx-button-primary-hover);
+}
+button.rx-button[data-variant='secondary'] {
+  border-radius: var(--rx-button-secondary-radius);
+  background: var(--rx-button-secondary);
+  border-color: var(--rx-button-secondary-border);
+  color: var(--rx-button-secondary-text);
+}
+button.rx-button[data-variant='secondary']:hover:not(:disabled) {
+  background: var(--rx-button-secondary-hover);
+}
+button.rx-button[data-variant='destructive'] {
+  border-radius: var(--rx-button-destructive-radius);
+  background: var(--rx-button-destructive);
+  color: #fff;
+}
+button.rx-button[data-variant='destructive']:hover:not(:disabled) {
+  background: var(--rx-button-destructive-hover);
+}
+button.rx-button:focus-visible {
+  outline: 3px solid var(--rx-button-focus);
+  outline-offset: 3px;
+}
+button.rx-button:disabled {
+  opacity: .55;
+  cursor: default;
+}
+@media (prefers-reduced-motion: no-preference) {
+  button.rx-button { transition: background .15s, border-color .15s; }
+}

@@ -26,8 +26,12 @@ class DynamoLocalTest {
             assertEquals(new Entry(30,1,3,2),repo.save("2025-12-29",30,1,3,1));
             assertThrows(StaleEntryException.class,()->repo.save("2025-12-29",0,0,0,1));
             assertThrows(StaleEntryException.class,()->repo.save("2026-01-05",0,0,0,2));
+            assertEquals(Goals.DEFAULT,repo.goals("owner"));
+            assertEquals(new Goals(8,3,200),repo.saveGoals("owner",new Goals(8,3,200)));
+            assertEquals(Goals.DEFAULT,repo.goals("someone-else"));
             try(var secondClient=DynamoClients.create(true,endpoint)) {
                 var restarted=new DynamoEntryRepository(secondClient,table,true);
+                assertEquals(new Goals(8,3,200),restarted.goals("owner"));
                 assertEquals(Map.of("2025-12-29",new Entry(30,1,3,2),"2026-01-04",new Entry(0,0,2,1)),restarted.week("2025-12-29","2026-01-04"));
                 assertEquals(Map.of(),restarted.week("2026-01-05","2026-01-11"));
                 assertEquals(185L,restarted.save("2025-12-29",30,1,3,2,185L).weight());

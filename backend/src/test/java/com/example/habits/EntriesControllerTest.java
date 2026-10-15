@@ -5,6 +5,14 @@ import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 class EntriesControllerTest {
     private org.springframework.security.oauth2.jwt.Jwt jwt(){return org.springframework.security.oauth2.jwt.Jwt.withTokenValue("test").header("alg","test").subject("test-user").build();}
+    @Test void settingsAreScopedToAuthenticatedUserAndRejectInvalidGoals(){
+        var repo=mock(EntryRepository.class);var controller=new EntriesController(repo,new LogOwner("test-user"));
+        var goals=new Goals(8,3,200);when(repo.saveGoals("test-user",goals)).thenReturn(goals);
+        assertEquals(goals,controller.saveSettings(Map.of("produce",8,"lifting",3,"cardio",200),jwt()).getBody());
+        verify(repo).saveGoals("test-user",goals);clearInvocations(repo);
+        for(var bad:java.util.List.of(Map.<String,Object>of("produce",0,"lifting",3,"cardio",200),Map.<String,Object>of("produce",8,"lifting",1.5,"cardio",200),Map.<String,Object>of("produce",8,"lifting",3,"cardio",200,"user","other")))assertThrows(IllegalArgumentException.class,()->controller.saveSettings(bad,jwt()));
+        verifyNoInteractions(repo);
+    }
     @Test void mondayToSundayAcrossYears() {
         EntryRepository repo = mock(EntryRepository.class);when(repo.weekForUser(eq("test-user"),anyString(), anyString())).thenReturn(Map.of());
         assertEquals(200, new EntriesController(repo,new LogOwner("test-user")).week("2025-12-29",jwt()).getStatusCode().value());

@@ -1,17 +1,48 @@
 import {Component,DestroyRef,ElementRef,OnInit,computed,effect,inject,signal,untracked,viewChild} from '@angular/core';
+import {ButtonDirective} from './ui/button.directive';
 import {FormsModule} from '@angular/forms';
 import {AuthService} from './auth.service';
 import {ConfigService} from './config.service';
 import {HabitsApiService} from './habits-api.service';
-import {dateKey,parseDate,weekKeys,totals,validateTotals,monthGrid,monthRows,shiftMonth,produceDayState} from './habits';
-import type {Entries,Entry,Measurement} from './habits';
+import {dateKey,parseDate,weekKeys,totals,validateTotals,monthGrid,monthRows,shiftMonth,produceDayState,defaultGoals} from './habits';
+import type {Entries,Entry,Measurement,Goals} from './habits';
 import {registerPublicReadTool,browserModelContext} from './browser-tools';
 import {buildReport,readReportEntries,reportDates} from './report';
 import {buildVersion} from './build-version';
 import {WholeNumberDirective} from './whole-number.directive';
-@Component({selector:'app-root',standalone:true,imports:[FormsModule,WholeNumberDirective],templateUrl:'./app.component.html'})
+@Component({selector:'app-root',standalone:true,imports:[FormsModule,WholeNumberDirective,ButtonDirective],templateUrl:'./app.component.html'})
 export class AppComponent implements OnInit {
   readonly buildVersion=buildVersion;
+  accountMenu=viewChild<ElementRef<HTMLElement>>('accountMenu');
+  accountMenuOpen=signal(false);
+  private settingsReturnPath=location.pathname==='/settings'?'/':location.pathname;
+  goals=signal<Goals>({...defaultGoals});
+  settingsPage=signal(location.pathname.replace(/\/$/,'')==='/settings');
+  settingsBusy=signal(false);settingsReady=signal(false);settingsStatus=signal('');settingsError=signal(false);
+  goalDraft:Goals={...defaultGoals};
+  async openSettings(){
+    if(this.cardioSave)await this.cardioSave;
+    if(this.saving()||!this.auth.signedIn())return;
+    this.accountMenuOpen.set(false);
+    if(!this.settingsPage()){this.settingsReturnPath=location.pathname;history.pushState(null,'','/settings');}
+    this.settingsPage.set(true);await this.loadSettings();
+  }
+  closeSettings(){if(this.settingsBusy())return;this.settingsPage.set(false);history.pushState(null,'',this.settingsReturnPath);}
+  private async loadSettings(){
+    const token=this.auth.token;this.settingsReady.set(false);this.settingsBusy.set(true);this.settingsStatus.set('');this.settingsError.set(false);
+    try{const goals=await this.api.settings();if(token===this.auth.token&&this.auth.signedIn()){this.goalDraft={...goals};this.settingsReady.set(true);}}
+    catch{this.settingsStatus.set('Unable to load settings. Please try again.');this.settingsError.set(true);}
+    finally{this.settingsBusy.set(false);}
+  }
+  async saveSettings(){
+    if(!this.auth.signedIn()||!this.settingsReady()||this.settingsBusy())return;
+    const token=this.auth.token;
+    if(!Object.entries(this.goalDraft).every(([key,value])=>Number.isInteger(value)&&value>=1&&value<=({produce:99,lifting:7,cardio:9999}[key as keyof Goals]))){this.settingsStatus.set('Enter positive whole numbers within the displayed limits.');this.settingsError.set(true);return;}
+    this.settingsBusy.set(true);this.settingsError.set(false);this.settingsStatus.set('Saving goals…');
+    try{const goals=await this.api.saveSettings({...this.goalDraft});if(token===this.auth.token&&this.auth.signedIn()){if(!this.viewUsername||this.viewUsername===this.accountUsername()){this.goals.set(goals);this.fill();}this.settingsStatus.set('Goals saved.');}}
+    catch{this.settingsStatus.set('Unable to save goals. Please try again.');this.settingsError.set(true);}
+    finally{this.settingsBusy.set(false);}
+  }
   showDetails=signal(false);
   async toggleDetails(){if(this.cardioSave)await this.cardioSave;if(this.saving())return;this.showDetails.update(shown=>!shown);}
 
@@ -30,16 +61,17 @@ export class AppComponent implements OnInit {
   canRead=computed(()=>!!this.viewUsername||this.auth.signedIn());
   canEdit=computed(()=>this.auth.signedIn()&&!!this.accountUsername()&&(!this.viewUsername||this.accountUsername()===this.viewUsername));
   today=dateKey();selectedDate=signal(this.api.page.date??this.today);entries=signal<Entries>({});loading=signal(false);saving=signal(false);loaded=signal(false);status=signal('');error=signal(false);syncLabel=signal('Connecting to your log…');
-  days=computed(()=>weekKeys(this.selectedDate()));weekTotals=computed(()=>totals(this.entries(),this.selectedDate()));daily=computed(()=>this.entries()[this.selectedDate()]);
+  days=computed(()=>weekKeys(this.selectedDate()));weekTotals=computed(()=>totals(this.entries(),this.selectedDate(),this.goals().produce));daily=computed(()=>this.entries()[this.selectedDate()]);
   cardio=0;lifting=0;produce=0;weight:number|null=null;systolic:number|null=null;diastolic:number|null=null;heartRate:number|null=null;sleepHours:number|null=null;calories:number|null=null;sugarGrams:number|null=null;saturatedFatGrams:number|null=null;sodiumMg:number|null=null;username='';password='';newPassword='';authBusy=signal(false);authStatus=signal('');private requestId=0;
   readonly produceIcons=['🥕','🍌','🍇','🍎','🥦'];
+  visibleProduceIcons=computed(()=>this.produceIcons.slice(0,Math.min(5,this.goals().produce)));
   produceSelections=[false,false,false,false,false];
   cardioSaving=signal(false);private cardioSave:Promise<void>|null=null;
   calendarMonth=signal(this.selectedDate().slice(0,7));calendarEntries=signal<Entries>({});calendarLoaded=signal(false);calendarLoading=signal(false);calendarError=signal('');private calendarRequestId=0;
   calendarDays=computed(()=>monthGrid(this.calendarMonth()));
   calendarRows=computed(()=>monthRows(this.calendarMonth()));
-  calendarWeekTotals(week:string){return totals(this.calendarEntries(),week);}
-  weekGoalMissed(week:string,goal:'cardio'|'lifting'){return this.calendarLoaded()&&weekKeys(week)[6]<this.today&&this.calendarWeekTotals(week)[goal]<(goal==='cardio'?150:2);}
+  calendarWeekTotals(week:string){return totals(this.calendarEntries(),week,this.goals().produce);}
+  weekGoalMissed(week:string,goal:'cardio'|'lifting'){return this.calendarLoaded()&&weekKeys(week)[6]<this.today&&this.calendarWeekTotals(week)[goal]<(this.goals()[goal]);}
   calendarTitle=computed(()=>parseDate(`${this.calendarMonth()}-01`).toLocaleDateString(undefined,{month:'long',year:'numeric'}));
   calendarSeasonIcon=computed(()=>{const month=Number(this.calendarMonth().slice(5,7));return month===12||month<=2?'❄️':month<=5?'🌺':month<=8?'🌞':'🍂';});
   monthPicker=viewChild<ElementRef<HTMLDialogElement>>('monthPicker');pickedMonth=Number(this.today.slice(5,7));pickedYear=Number(this.today.slice(0,4));
@@ -74,7 +106,7 @@ export class AppComponent implements OnInit {
       if(this.canEdit()&&this.cardio!==(this.daily()?.cardio||0))throw new Error('Your cardio change could not be saved. Correct it before exporting.');
       const entries=await readReportEntries(start,end,this.today,week=>this.api.readWeek(week),(done,total)=>this.exportStatus.set(`Loading saved entries: ${done} of ${total} weeks…`));
       if(report.closed)throw new Error('The report tab was closed. Generate it again when you are ready.');
-      report.document.open();report.document.write(buildReport(start,end,entries,this.today));report.document.close();
+      report.document.open();report.document.write(buildReport(start,end,entries,this.today,new Date(),this.goals()));report.document.close();
       this.exportStatus.set('Report ready. Use Print / Save as PDF in the report tab.');
     }catch(error){report?.close();this.exportError.set(true);this.exportStatus.set(error instanceof Error&&!(error as {status?:number}).status?error.message:'Unable to load the report. Please try again.');}
     finally{this.exportBusy.set(false);}
@@ -82,21 +114,22 @@ export class AppComponent implements OnInit {
   private destroyRef=inject(DestroyRef);
   constructor(){effect(()=>{
     const signedIn=this.auth.signedIn();untracked(()=>{
-    this.accountUsername.set(null);
+    this.accountUsername.set(null);this.settingsReady.set(false);
+    if(!signedIn){this.goals.set({...defaultGoals});}
     if(signedIn){this.loadAccount();}
     if(signedIn||this.viewUsername){this.loadWeek();this.loadCalendar();}
     else{
       this.requestId++;this.calendarRequestId++;
       this.entries.set({});this.calendarEntries.set({});this.loaded.set(false);this.calendarLoaded.set(false);this.loading.set(false);this.calendarLoading.set(false);this.calendarError.set('');
-      this.cardio=0;this.lifting=0;this.produce=0;this.weight=null;this.systolic=null;this.diastolic=null;this.heartRate=null;this.sleepHours=null;this.calories=null;this.sugarGrams=null;this.saturatedFatGrams=null;this.sodiumMg=null;this.produceSelections=this.produceIcons.map(()=>false);
+      this.cardio=0;this.lifting=0;this.produce=0;this.weight=null;this.systolic=null;this.diastolic=null;this.heartRate=null;this.sleepHours=null;this.calories=null;this.sugarGrams=null;this.saturatedFatGrams=null;this.sodiumMg=null;this.produceSelections=this.visibleProduceIcons().map(()=>false);
       this.syncLabel.set('Sign in to view your log.');
     }
   });});}
-  private async loadAccount(){const token=this.auth.token;try{const profile=await this.api.profile();if(this.auth.signedIn()&&this.auth.token===token){this.accountUsername.set(profile.username);if(this.viewUsername===profile.username){this.loadWeek();this.loadCalendar();}}}catch{this.status.set('Unable to load your account. Please sign in again.');this.error.set(true);}}
-  ngOnInit(){if(!this.viewUsername&&!this.auth.canDevLogin)setTimeout(()=>this.openLogin(),0);const lifecycle=new AbortController();this.destroyRef.onDestroy(()=>lifecycle.abort());registerPublicReadTool(()=>{if(!this.canRead()||!this.loaded())throw new Error('Shared progress has not loaded.');return {week:this.days(),entries:this.entries(),totals:this.weekTotals()};},lifecycle.signal,browserModelContext());}
-  calendarState(day:string){return produceDayState(day,this.today,this.calendarLoaded()?this.calendarEntries():null);}
+  private async loadAccount(){const token=this.auth.token;try{const profile=await this.api.profile();if(this.auth.signedIn()&&this.auth.token===token){this.accountUsername.set(profile.username);if(!this.viewUsername||this.viewUsername===profile.username)this.goals.set(profile.goals);if(this.settingsPage())this.loadSettings();if(this.viewUsername===profile.username){this.loadWeek();this.loadCalendar();}}}catch{this.status.set('Unable to load your account. Please sign in again.');this.error.set(true);}}
+  ngOnInit(){if(!this.viewUsername&&!this.auth.canDevLogin)setTimeout(()=>this.openLogin(),0);const lifecycle=new AbortController();document.addEventListener('click',event=>{const menu=this.accountMenu()?.nativeElement;if(menu&&event.target instanceof Node&&!menu.contains(event.target))this.accountMenuOpen.set(false);},{signal:lifecycle.signal});window.addEventListener('popstate',()=>{this.settingsPage.set(new URLSearchParams(location.search).has('settings'));if(this.settingsPage()&&this.auth.signedIn())this.loadSettings();},{signal:lifecycle.signal});this.destroyRef.onDestroy(()=>lifecycle.abort());registerPublicReadTool(()=>{if(!this.canRead()||!this.loaded())throw new Error('Shared progress has not loaded.');return {week:this.days(),entries:this.entries(),totals:this.weekTotals()};},lifecycle.signal,browserModelContext());}
+  calendarState(day:string){return produceDayState(day,this.today,this.calendarLoaded()?this.calendarEntries():null,this.goals().produce);}
   calendarProduceIcons(day:string){return this.produceIcons.slice(0,Math.min(5,this.calendarEntries()[day]?.produce||0));}
-  calendarLabel(day:string){const state=this.calendarState(day),entry=this.calendarEntries()[day];return `${parseDate(day).toLocaleDateString(undefined,{weekday:'long',month:'long',day:'numeric',year:'numeric'})}: ${state==='future'?'future date':state==='unknown'?'progress not loaded':`${entry?.produce||0} servings, ${state==='met'?'goal reached':'fewer than five'}, ${entry?.lifting||0} lift sessions, ${entry?.cardio||0} cardio minutes`}`;}
+  calendarLabel(day:string){const state=this.calendarState(day),entry=this.calendarEntries()[day];return `${parseDate(day).toLocaleDateString(undefined,{weekday:'long',month:'long',day:'numeric',year:'numeric'})}: ${state==='future'?'future date':state==='unknown'?'progress not loaded':`${entry?.produce||0} servings, ${state==='met'?'goal reached':'below goal'}, ${entry?.lifting||0} lift sessions, ${entry?.cardio||0} cardio minutes`}`;}
   async changeMonth(offset:number){if(this.saving())return;this.calendarMonth.set(shiftMonth(this.calendarMonth(),offset));await this.loadCalendar();}
   async calendarToday(){if(this.saving())return;this.calendarMonth.set(this.today.slice(0,7));await this.loadCalendar();}
   async loadCalendar(){
@@ -148,7 +181,7 @@ export class AppComponent implements OnInit {
     finally{this.saving.set(false);}
   }
   dayLabel(key:string){return parseDate(key).toLocaleDateString(undefined,{weekday:'short',day:'numeric'});}
-  private fill(){const entry=this.daily();this.cardio=entry?.cardio||0;this.lifting=entry?.lifting||0;this.produce=entry?.produce||0;this.weight=entry?.weight??null;this.systolic=entry?.systolic??null;this.diastolic=entry?.diastolic??null;this.heartRate=entry?.heartRate??null;this.sleepHours=entry?.sleepHours??null;this.calories=entry?.calories??null;this.sugarGrams=entry?.sugarGrams??null;this.saturatedFatGrams=entry?.saturatedFatGrams??null;this.sodiumMg=entry?.sodiumMg??null;this.prefillWeight();this.produceSelections=this.produceIcons.map((_,index)=>index<this.produce);}
+  private fill(){const entry=this.daily();this.cardio=entry?.cardio||0;this.lifting=entry?.lifting||0;this.produce=entry?.produce||0;this.weight=entry?.weight??null;this.systolic=entry?.systolic??null;this.diastolic=entry?.diastolic??null;this.heartRate=entry?.heartRate??null;this.sleepHours=entry?.sleepHours??null;this.calories=entry?.calories??null;this.sugarGrams=entry?.sugarGrams??null;this.saturatedFatGrams=entry?.saturatedFatGrams??null;this.sodiumMg=entry?.sodiumMg??null;this.prefillWeight();this.produceSelections=this.visibleProduceIcons().map((_,index)=>index<this.produce);}
   saveCardio(){
     if(this.cardioSave)return this.cardioSave;
     if(this.saving()||this.loading()||!this.loaded()||!this.canEdit()||this.cardio===(this.daily()?.cardio||0))return Promise.resolve();
@@ -204,14 +237,14 @@ export class AppComponent implements OnInit {
       // A quick serving save must not submit unfinished exercise fields.
       const result=await this.saveDaily(day,{cardio:saved?.cardio||0,lifting:saved?.lifting||0,produce:this.produce},saved?.revision||0);
       this.savedEntry(day,result.entry);
-      this.status.set(`${this.produce} servings saved${this.produce>=5?' · Goal reached!':'.'}`);
+      this.status.set(`${this.produce} servings saved${this.produce>=this.goals().produce?' · Goal reached!':'.'}`);
     }catch(error){
       this.produceSelections=previousSelections;this.produce=previousTotal;
       this.status.set(this.api.error(error));this.error.set(true);
     }finally{this.saving.set(false);}
   }
   async selectDate(key:string){if(this.saving()||!key)return;try{parseDate(key);const previous=this.days()[0];this.selectedDate.set(key);if(this.viewUsername)history.replaceState(null,'','/'+this.viewUsername+'/'+key.slice(5,7)+key.slice(8,10)+key.slice(0,4));if(key.slice(0,7)!==this.calendarMonth()){this.calendarMonth.set(key.slice(0,7));this.loadCalendar();}this.status.set('');this.fill();if(previous!==this.days()[0]||!this.loaded())await this.loadWeek();}catch{this.status.set('Choose a valid date.');this.error.set(true);}}
-  async loadWeek(){if(this.saving()||!this.canRead())return;if(!this.config.configured){this.syncLabel.set('Preview only · connect AWS to load and save shared progress.');return;}const id=++this.requestId,week=this.days()[0];this.loading.set(true);this.loaded.set(false);this.syncLabel.set('Loading shared progress…');try{const result=await this.api.readWeek(week);if(id!==this.requestId)return;for(const [day,entry] of Object.entries(result.entries)){if(!this.days().includes(day))throw new Error('Unexpected entry');validateTotals(entry);if(!Number.isSafeInteger(entry.revision)||entry.revision<1)throw new Error('Invalid revision');}this.entries.set(result.entries);this.loaded.set(true);this.fill();this.syncLabel.set(`Updated ${new Date().toLocaleString('en-US',{month:'2-digit',day:'2-digit',year:'numeric',hour:'numeric',minute:'2-digit'}).replace(',','')}`);this.status.set('');}catch(error){if(id===this.requestId){this.status.set(this.api.error(error));this.error.set(true);this.syncLabel.set('Unable to load shared progress.');}}finally{if(id===this.requestId)this.loading.set(false);}}
+  async loadWeek(){if(this.saving()||!this.canRead())return;if(!this.config.configured){this.syncLabel.set('Preview only · connect AWS to load and save shared progress.');return;}const id=++this.requestId,week=this.days()[0];this.loading.set(true);this.loaded.set(false);this.syncLabel.set('Loading shared progress…');try{const result=await this.api.readWeek(week);if(id!==this.requestId)return;for(const [day,entry] of Object.entries(result.entries)){if(!this.days().includes(day))throw new Error('Unexpected entry');validateTotals(entry);if(!Number.isSafeInteger(entry.revision)||entry.revision<1)throw new Error('Invalid revision');}this.goals.set(result.goals??{...defaultGoals});this.entries.set(result.entries);this.loaded.set(true);this.fill();this.syncLabel.set(`Updated ${new Date().toLocaleString('en-US',{month:'2-digit',day:'2-digit',year:'numeric',hour:'numeric',minute:'2-digit'}).replace(',','')}`);this.status.set('');}catch(error){if(id===this.requestId){this.status.set(this.api.error(error));this.error.set(true);this.syncLabel.set('Unable to load shared progress.');}}finally{if(id===this.requestId)this.loading.set(false);}}
   async save(){if(this.saving())return;try{if(!this.canEdit())throw new Error('Sign in as this user to edit the log.');if(!this.canRead()||!this.loaded())throw new Error('Load progress before saving.');if(this.selectedDate()>dateKey())throw new Error('Log a completed day, not a future date.');const entry={cardio:this.cardio,lifting:this.lifting,produce:this.produce};validateTotals(entry);this.saving.set(true);this.status.set('Saving…');this.error.set(false);const day=this.selectedDate(),result=await this.saveDaily(day,entry,this.daily()?.revision||0);this.savedEntry(day,result.entry);this.status.set('Day saved to the shared log.');}catch(error){this.status.set(error instanceof Error&&!(error as {status?:number}).status&&error.name!=='TimeoutError'?error.message:this.api.error(error));this.error.set(true);}finally{this.saving.set(false);}}
   openLogin(){if(this.auth.canDevLogin){this.devLogin();return;}if(!this.config.configured){this.status.set('AWS must be connected before sign-in is available.');this.error.set(true);return;}this.authStatus.set('');this.dialog()?.nativeElement.showModal();}
   async devLogin(){if(this.authBusy())return;this.authBusy.set(true);try{await this.auth.devLogin();this.status.set('Signed in locally.');this.error.set(false);}catch(error){this.status.set(this.auth.error(error));this.error.set(true);}finally{this.authBusy.set(false);}}

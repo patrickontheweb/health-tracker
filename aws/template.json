@@ -561,6 +561,44 @@
         }
       }
     },
+    "SettingsReadRoute": {
+      "Type": "AWS::ApiGatewayV2::Route",
+      "Properties": {
+        "ApiId": {
+          "Ref": "Api"
+        },
+        "RouteKey": "GET /me/settings",
+        "AuthorizationType": "JWT",
+        "AuthorizerId": {
+          "Ref": "Authorizer"
+        },
+        "AuthorizationScopes": [
+          "aws.cognito.signin.user.admin"
+        ],
+        "Target": {
+          "Fn::Sub": "integrations/${Integration}"
+        }
+      }
+    },
+    "SettingsWriteRoute": {
+      "Type": "AWS::ApiGatewayV2::Route",
+      "Properties": {
+        "ApiId": {
+          "Ref": "Api"
+        },
+        "RouteKey": "PUT /me/settings",
+        "AuthorizationType": "JWT",
+        "AuthorizerId": {
+          "Ref": "Authorizer"
+        },
+        "AuthorizationScopes": [
+          "aws.cognito.signin.user.admin"
+        ],
+        "Target": {
+          "Fn::Sub": "integrations/${Integration}"
+        }
+      }
+    },
     "PublicReadRoute": {
       "Type": "AWS::ApiGatewayV2::Route",
       "Properties": {

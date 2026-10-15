@@ -62,6 +62,14 @@ public class DynamoEntryRepository implements EntryRepository {
             .conditionExpression("attribute_not_exists(#user) OR #user = :user").expressionAttributeNames(Map.of("#user","user")).expressionAttributeValues(Map.of(":user",s(user))));}
         catch(ConditionalCheckFailedException error){throw new StaleEntryException();}
     }
+    @Override public Goals goals(String user){
+        var item=client.getItem(r->r.tableName(table).consistentRead(true).key(Map.of("log",s(userPartition(user)),"day",s("~settings")))).item();
+        return item.isEmpty()?Goals.DEFAULT:new Goals(Long.parseLong(item.get("produce").n()),Long.parseLong(item.get("lifting").n()),Long.parseLong(item.get("cardio").n()));
+    }
+    @Override public Goals saveGoals(String user,Goals goals){
+        client.putItem(r->r.tableName(table).item(Map.of("log",s(userPartition(user)),"day",s("~settings"),"produce",n(goals.produce()),"lifting",n(goals.lifting()),"cardio",n(goals.cardio()))));
+        return goals;
+    }
     @Override public Map<String,Entry> weekForUser(String user,String start,String end){return query(userPartition(user),start,end);}
     private Map<String,Entry> query(String partition,String start,String end){
         var pages = client.queryPaginator(request -> request.tableName(table).consistentRead(true)
