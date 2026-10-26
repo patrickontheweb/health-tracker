@@ -13,7 +13,7 @@ function fixture(saved,{credentials={},enabled=false}={}){
   const signal=value=>{const fn=()=>value;fn.set=next=>value=next;return fn;};
   const exports={};
   vm.runInNewContext(ts.transpileModule(readFileSync(new URL('../src/app/auth.service.ts',import.meta.url),'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022,experimentalDecorators:true}}).outputText,{
-    exports,Date,URL,PublicKeyCredential:class{},navigator:{credentials},window:{isSecureContext:true},localStorage:{getItem:k=>storage.get(k)??null,setItem:(k,v)=>storage.set(k,v),removeItem:k=>storage.delete(k)},setInterval(){},
+    exports,Date,URL,AbortController,PublicKeyCredential:class{},navigator:{credentials},window:{isSecureContext:true},localStorage:{getItem:k=>storage.get(k)??null,setItem:(k,v)=>storage.set(k,v),removeItem:k=>storage.delete(k)},setInterval(){},
     require(name){if(name==='./passkeys')return passkeys;if(name==='@angular/core')return {Injectable:()=>x=>x,inject:t=>t==='http'?http:config,signal,isDevMode:()=>false};if(name==='@angular/common/http')return {HttpClient:'http',HttpHeaders:class{},HttpErrorResponse:class extends Error{}};if(name==='rxjs')return {firstValueFrom:x=>x,timeout:()=>{}};return {ConfigService:'config'};}
   });
   return {auth:new exports.AuthService(),calls,storage,respond:fn=>respond=fn};
@@ -48,3 +48,15 @@ test('cancelled passkey login does not authenticate or save a session',async()=>
   await assert.rejects(f.auth.loginWithPasskey('user',true),/cancelled/);assert.equal(f.auth.signedIn(),false);assert.equal(f.storage.size,0);assert.equal(f.calls.length,1);
 });
 test('accounts without a registered passkey retain the password fallback',async()=>{const f=fixture(null,{enabled:true});f.respond(()=>({AvailableChallenges:['PASSWORD']}));await assert.rejects(f.auth.loginWithPasskey('user',false),/password/);assert.equal(f.auth.signedIn(),false);});
+test('switching to password cancels a passkey request before the browser prompt',async()=>{
+  let finish;const f=fixture(null,{enabled:true,credentials:{get:()=>assert.fail('cancelled flow must not prompt')}});
+  f.respond(()=>new Promise(resolve=>{finish=resolve;}));const pending=f.auth.loginWithPasskey('user',false);await Promise.resolve();f.auth.cancelPasskeyLogin();
+  finish({ChallengeName:'WEB_AUTHN',Session:'session',ChallengeParameters:{CREDENTIAL_REQUEST_OPTIONS:'{"challenge":"AQID"}'}});
+  await assert.rejects(pending,/cancelled/);assert.equal(f.auth.signedIn(),false);
+});
+test('switching to password aborts the browser request and rejects a late credential',async()=>{
+  let finish,signal;const f=fixture(null,{enabled:true,credentials:{get:options=>{signal=options.signal;return new Promise(resolve=>{finish=resolve;});}}});
+  f.respond(()=>({ChallengeName:'WEB_AUTHN',Session:'session',ChallengeParameters:{CREDENTIAL_REQUEST_OPTIONS:'{"challenge":"AQID"}'}}));
+  const pending=f.auth.loginWithPasskey('user',false);for(let i=0;i<5&&!finish;i++)await Promise.resolve();f.auth.cancelPasskeyLogin();assert.equal(signal.aborted,true);finish(credential());
+  await assert.rejects(pending,/cancelled/);assert.equal(f.calls.length,1);assert.equal(f.auth.signedIn(),false);
+});

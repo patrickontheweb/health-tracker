@@ -30,17 +30,24 @@ export class AuthService {
     if(generation!==this.generation)throw new Error('Sign in again to add a passkey.');
     await this.call('CompleteWebAuthnRegistration',{AccessToken:token,Credential:credentialJSON(credential)});this.rememberUsername(username);
   }
+  private passkeyRequest:AbortController|null=null;
+  cancelPasskeyLogin(){this.passkeyRequest?.abort();}
   async loginWithPasskey(username:string,remember:boolean){
     if(!this.passkeysSupported)throw new Error('Passkeys are not available in this browser. Sign in with your password.');
     const name=username.trim();if(!name)throw new Error('Enter your username first.');
+    this.cancelPasskeyLogin();const request=new AbortController();this.passkeyRequest=request;
+    const checkCancelled=()=>{if(request.signal.aborted)throw new Error('Passkey sign-in was cancelled.');};
+    try{
     const generation=this.generation;
     const start=await this.call('InitiateAuth',{ClientId:this.config.value.clientId,AuthFlow:'USER_AUTH',AuthParameters:{USERNAME:name,PREFERRED_CHALLENGE:'WEB_AUTHN'}});
+    checkCancelled();
     if(start.ChallengeName!=='WEB_AUTHN'||!start.Session||!start.ChallengeParameters?.['CREDENTIAL_REQUEST_OPTIONS'])throw new Error('Sign in with your password, then add a passkey in User Settings.');
-    const credential=await navigator.credentials.get({publicKey:requestOptions(start.ChallengeParameters['CREDENTIAL_REQUEST_OPTIONS'])}) as PublicKeyCredential|null;
-    if(!credential)throw new Error('Passkey sign-in was cancelled.');
+    const credential=await navigator.credentials.get({signal:request.signal,publicKey:requestOptions(start.ChallengeParameters['CREDENTIAL_REQUEST_OPTIONS'])}) as PublicKeyCredential|null;
+    checkCancelled();if(!credential)throw new Error('Passkey sign-in was cancelled.');
     const result=await this.call('RespondToAuthChallenge',{ClientId:this.config.value.clientId,ChallengeName:'WEB_AUTHN',Session:start.Session,ChallengeResponses:{USERNAME:name,CREDENTIAL:JSON.stringify(credentialJSON(credential))}});
-    if(generation!==this.generation)throw new Error('Sign-in was cancelled. Please try again.');
+    checkCancelled();if(generation!==this.generation)throw new Error('Sign-in was cancelled. Please try again.');
     this.finishLogin(result,remember);if(remember)this.rememberUsername(name);
+    }finally{if(this.passkeyRequest===request)this.passkeyRequest=null;}
   }
   get canDevLogin(){try{const url=new URL(this.config.value.apiUrl);return isDevMode()&&this.config.value.devLogin===true&&url.protocol==='http:'&&['127.0.0.1','localhost','[::1]'].includes(url.hostname);}catch{return false;}}
   async devLogin(){
@@ -67,7 +74,7 @@ export class AuthService {
     this.devSession=false;this.challenge.set(null);this.accept(result);
   }
   async changePassword(previous:string,next:string){await this.ensureSession();if(this.devSession)throw new Error('Password changes are available for Cognito accounts only.');await this.call('ChangePassword',{AccessToken:this.token,PreviousPassword:previous,ProposedPassword:next});}
-  clear(){this.generation++;this.forget();this.refreshToken=null;this.accessToken=null;this.expiry=0;this.devSession=false;this.signedIn.set(false);this.challenge.set(null);}
+  clear(){this.cancelPasskeyLogin();this.generation++;this.forget();this.refreshToken=null;this.accessToken=null;this.expiry=0;this.devSession=false;this.signedIn.set(false);this.challenge.set(null);}
   async logout(){const token=this.token,local=this.devSession;this.clear();if(token&&!local)await this.call('GlobalSignOut',{AccessToken:token});}
   error(error:unknown):string{if(error instanceof Error&&['NotAllowedError','AbortError'].includes(error.name))return 'Passkey request cancelled or timed out. You can try again or use your password.';if(error instanceof HttpErrorResponse)return error.error?.message||'Sign-in failed. Check your username and password.';return error instanceof Error?error.message:'Could not sign in.';}
 }

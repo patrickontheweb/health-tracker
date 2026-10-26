@@ -11,7 +11,8 @@ Open https://lifestylerx.org in Chrome on Android or Safari on iPhone.
    the device prompt. Next time a sign-in is needed on this browser, the saved username starts
    the passkey prompt automatically. On a new browser, enter your username and
    choose **Sign in with a passkey**. Fingerprint, face recognition, or the
-   device screen lock can verify the passkey. Password login remains available.
+   device screen lock can verify the passkey. Choose **Use username and password instead** at any time to open the password
+   form; switching cancels any pending passkey request.
 
 Passkeys belong to the production domain and must be enrolled on the live site.
 Local Dev Login does not create production passkeys. Production configuration
