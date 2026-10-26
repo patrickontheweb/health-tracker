@@ -1,3 +1,4 @@
+import {checkPasskeys} from './passkeys-aws.mjs';
 import {execFileSync} from 'node:child_process';
 import {createHash} from 'node:crypto';
 import {readFile,writeFile,mkdtemp} from 'node:fs/promises';
@@ -50,6 +51,8 @@ export async function infrastructure({env=process.env,aws=runAws,fetchHttp=fetch
     aws('cloudformation','execute-change-set','--stack-name','health-habits','--change-set-name',name);
     try{aws('cloudformation','wait','stack-update-complete','--stack-name','health-habits');}
     catch(error){const state=json('cloudformation','describe-stacks','--stack-name','health-habits').Stacks[0].StackStatus;throw new Error(`Stack update did not complete successfully (${state}); inspect CloudFormation events`,{cause:error});}
+    const updated=json('cloudformation','describe-stacks','--stack-name','health-habits').Stacks[0];
+    checkPasskeys({aws,outputs:updated.Outputs,repair:true});
     await summary('Infrastructure update completed successfully. Application code and existing parameters were preserved.');return {applied:true,name};
   }
   const template=JSON.parse(await readFile(templatePath,'utf8'));

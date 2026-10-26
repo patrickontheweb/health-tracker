@@ -1,3 +1,4 @@
+import {checkPasskeys} from './passkeys-aws.mjs';
 import {execFileSync} from 'node:child_process';
 import {readFile,writeFile,mkdtemp,stat} from 'node:fs/promises';
 import {tmpdir} from 'node:os';
@@ -40,6 +41,7 @@ if(description.Parameters.find(p=>p.ParameterKey==='ArtifactBucket')?.ParameterV
 const outputs=description.Outputs;
 if(requireOutput(outputs,'RecordsMode')!=='per-user-v1')throw new Error('Update the stack for per-user records before deploying');
 if(!description.Parameters.find(p=>p.ParameterKey==='LegacyLogOwnerSub')?.ParameterValue)throw new Error('Set LegacyLogOwnerSub to preserve the existing log under its owner account before deploying');
+checkPasskeys({aws,outputs});
 const functionName=requireOutput(outputs,'ApiFunctionName'),websiteBucket=requireOutput(outputs,'WebsiteBucket');
 const distribution=requireOutput(outputs,'DistributionId'),apiUrl=requireOutput(outputs,'ApiUrl');
 const websiteUrl=requireOutput(outputs,'WebsiteUrl'),clientId=requireOutput(outputs,'ClientId');

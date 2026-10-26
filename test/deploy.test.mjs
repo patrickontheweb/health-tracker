@@ -9,10 +9,11 @@ async function fixture({failUpdate=false,stackStatus='UPDATE_COMPLETE'}={}) {
   const dir=await mkdtemp(join(tmpdir(),'health-deploy-test-')),site=join(dir,'site'),jar=join(dir,'api.jar');
   await mkdir(site);await writeFile(join(site,'sw.js'),'// worker');await writeFile(join(site,'manifest.webmanifest'),'{}');await writeFile(join(site,'index.html'),'<html>new website</html>');await writeFile(jar,'fake-jar');
   const calls=[],env={GITHUB_SHA:'a'.repeat(40),GITHUB_RUN_ID:'123',GITHUB_RUN_ATTEMPT:'1',AWS_STACK_NAME:'health-habits',AWS_ARTIFACT_BUCKET:'pcmckenna-health',AWS_REGION:'us-east-1'};
-  const values={RecordsMode:'per-user-v1',ApiFunctionName:'habits-api',WebsiteBucket:'habits-website',DistributionId:'DIST123',ApiUrl:'https://api.example',WebsiteUrl:'https://site.example',ClientId:'client123',Region:'us-east-1',PasskeysEnabled:'true'};
+  const values={RecordsMode:'per-user-v1',ApiFunctionName:'habits-api',WebsiteBucket:'habits-website',DistributionId:'DIST123',ApiUrl:'https://api.example',WebsiteUrl:'https://site.example',ClientId:'client123',Region:'us-east-1',UserPoolId:'us-east-1_test',PasskeysEnabled:'true'};
   const invokeAws=(...args)=> {
     calls.push(args);
     if(args[0]==='cloudformation') return JSON.stringify({Stacks:[{StackStatus:stackStatus,Parameters:[{ParameterKey:'ArtifactBucket',ParameterValue:'pcmckenna-health'},{ParameterKey:'LegacyLogOwnerSub',ParameterValue:'owner-sub'}],Outputs:Object.entries(values).map(([OutputKey,OutputValue])=>({OutputKey,OutputValue}))}]});
+    if(args[1]==='get-user-pool-mfa-config')return JSON.stringify({WebAuthnConfiguration:{RelyingPartyId:'site.example',UserVerification:'required'}});
     if(args[1]==='get-function') return JSON.stringify({Code:{Location:'https://code.example'},Configuration:{RevisionId:'old-revision'}});
     if(args[1]==='get-function-configuration') return JSON.stringify({RevisionId:'new-revision'});
     if(args[1]==='update-function-code' && failUpdate && args.includes(`releases/${env.GITHUB_SHA}/123-1/api.jar`)) throw new Error('Simulated update failure');

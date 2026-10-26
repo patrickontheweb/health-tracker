@@ -38,7 +38,7 @@ jobs:
           node-version: '24'
           package-manager-cache: false
       - name: Test infrastructure update logic
-        run: node --test test/infrastructure.test.mjs
+        run: node --test test/infrastructure.test.mjs test/passkeys-aws.test.mjs
       - name: Regenerate infrastructure template
         run: node aws/build-template.mjs
       - uses: aws-actions/configure-aws-credentials@e1253824e5c10ff9df46874f81ed3ec929e19cfd
