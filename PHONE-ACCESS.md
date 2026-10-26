@@ -8,7 +8,8 @@ Open https://lifestylerx.org in Chrome on Android or Safari on iPhone.
 2. Sign in with your password and select **Remember me** on a personal phone
    to keep the session for up to 30 days.
 3. Under **User Settings → Faster sign-in**, choose **Add a passkey** and follow
-   the device prompt. Next time a sign-in is needed, enter your username and
+   the device prompt. Next time a sign-in is needed on this browser, the saved username starts
+   the passkey prompt automatically. On a new browser, enter your username and
    choose **Sign in with a passkey**. Fingerprint, face recognition, or the
    device screen lock can verify the passkey. Password login remains available.
 
