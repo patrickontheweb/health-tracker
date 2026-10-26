@@ -109,3 +109,5 @@ footer{text-align:right;border-top:0}
 /* Action placement; visual styling lives in app/ui/buttons.css. */
 .settings-panel form > .rx-button, dialog form > .rx-button {width:100%;margin-top:24px}
 .user-strip-login{margin-left:auto}
+
+.remember-me{display:flex;align-items:center;gap:8px;margin:16px 0}.remember-me input{width:auto;margin:0}

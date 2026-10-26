@@ -243,7 +243,7 @@
         },
         "Policies": {
           "PasswordPolicy": {
-            "MinimumLength": 12,
+            "MinimumLength": 8,
             "RequireLowercase": true,
             "RequireUppercase": true,
             "RequireNumbers": true,
@@ -268,7 +268,7 @@
         "PreventUserExistenceErrors": "ENABLED",
         "AccessTokenValidity": 1,
         "IdTokenValidity": 1,
-        "RefreshTokenValidity": 1,
+        "RefreshTokenValidity": 30,
         "TokenValidityUnits": {
           "AccessToken": "hours",
           "IdToken": "hours",

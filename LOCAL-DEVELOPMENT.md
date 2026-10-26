@@ -31,8 +31,12 @@ with loopback local API configuration. The endpoint and its short-lived, in-memo
 tokens exist only in Spring Boot's local profile with a local database; they are
 disabled in production and Lambda. Dev Login does not require internet. Cognito
 sign-in still requires internet; daily entries are stored in the **local** database.
-The production API and its records remain separate. Refreshing or reopening the
-page requires signing in again, as on the live site.
+The production API and its records remain separate. Dev Login requires signing in again after refreshing. Cognito sign-in offers
+Remember me for up to 30 days, using a refresh token in browser local storage;
+passwords and access tokens are never persisted. Logout clears the saved token.
+The 30-day validity and 8-character password minimum require the updated AWS
+template to be deployed; existing passwords are unchanged. Change a Cognito
+password under User Settings.
 
 Stop each terminal with Ctrl+C. Restarting the database preserves its records.
 There is no automatic copying between local data and production.
