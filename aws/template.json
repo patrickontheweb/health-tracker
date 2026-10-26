@@ -249,9 +249,31 @@
             "RequireNumbers": true,
             "RequireSymbols": true,
             "TemporaryPasswordValidityDays": 7
+          },
+          "SignInPolicy": {
+            "AllowedFirstAuthFactors": [
+              "PASSWORD",
+              "WEB_AUTHN"
+            ]
           }
         },
-        "MfaConfiguration": "OFF"
+        "MfaConfiguration": "OFF",
+        "UserPoolTier": "ESSENTIALS",
+        "WebAuthnUserVerification": "required",
+        "WebAuthnRelyingPartyID": {
+          "Fn::If": [
+            "UseCustomDomain",
+            {
+              "Ref": "CustomDomainName"
+            },
+            {
+              "Fn::GetAtt": [
+                "Website",
+                "DomainName"
+              ]
+            }
+          ]
+        }
       }
     },
     "EditorClient": {
@@ -262,6 +284,7 @@
         },
         "GenerateSecret": false,
         "ExplicitAuthFlows": [
+          "ALLOW_USER_AUTH",
           "ALLOW_USER_PASSWORD_AUTH",
           "ALLOW_REFRESH_TOKEN_AUTH"
         ],
@@ -1067,6 +1090,9 @@
     },
     "RecordsMode": {
       "Value": "per-user-v1"
+    },
+    "PasskeysEnabled": {
+      "Value": "true"
     },
     "CloudFormationRoleArn": {
       "Value": {

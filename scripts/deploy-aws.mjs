@@ -45,9 +45,9 @@ const distribution=requireOutput(outputs,'DistributionId'),apiUrl=requireOutput(
 const websiteUrl=requireOutput(outputs,'WebsiteUrl'),clientId=requireOutput(outputs,'ClientId');
 const region=requireOutput(outputs,'Region');
 if(region!=='us-east-1') throw new Error('Unexpected stack region');
-await stat(jar);await stat(join(site,'index.html'));
+await stat(jar);await stat(join(site,'index.html'));await stat(join(site,'sw.js'));
 // Generate the website configuration from the actual AWS outputs on every deployment.
-await writeFile(join(site,'config.json'),JSON.stringify({apiUrl,region,clientId},null,2)+'\n');
+await writeFile(join(site,'config.json'),JSON.stringify({apiUrl,region,clientId,passkeys:outputs.find(o=>o.OutputKey==='PasskeysEnabled')?.OutputValue==='true'},null,2)+'\n');
 const release=`releases/${sha}/${run}-${attempt}`;
 const artifactKey=`${release}/api.jar`,baselineKey=`${release}/previous-api.jar`;
 const temp=await mkdtemp(join(tmpdir(),'health-deploy-'));
@@ -67,9 +67,11 @@ try {
   await checkApi(apiUrl,fetchHttp);
   websiteStarted=true;
   // Upload new hashed assets first, retaining old assets for already-open browsers.
-  aws('s3','sync',site,`s3://${websiteBucket}/`,'--exclude','index.html','--exclude','config.json','--cache-control','public,max-age=31536000,immutable');
+  aws('s3','sync',site,`s3://${websiteBucket}/`,'--exclude','index.html','--exclude','config.json','--exclude','sw.js','--exclude','manifest.webmanifest','--cache-control','public,max-age=31536000,immutable');
   aws('s3','cp',join(site,'config.json'),`s3://${websiteBucket}/config.json`,'--content-type','application/json','--cache-control','no-cache');
   aws('s3','cp',join(site,'index.html'),`s3://${websiteBucket}/index.html`,'--content-type','text/html','--cache-control','no-cache');
+  aws('s3','cp',join(site,'manifest.webmanifest'),`s3://${websiteBucket}/manifest.webmanifest`,'--content-type','application/manifest+json','--cache-control','no-cache');
+  aws('s3','cp',join(site,'sw.js'),`s3://${websiteBucket}/sw.js`,'--content-type','application/javascript','--cache-control','no-cache');
   const invalidation=json('cloudfront','create-invalidation','--distribution-id',distribution,'--paths','/*');
   aws('cloudfront','wait','invalidation-completed','--distribution-id',distribution,'--id',invalidation.Invalidation.Id);
   const response=await fetchHttp(websiteUrl,{signal:AbortSignal.timeout(30000),cache:'no-store'});

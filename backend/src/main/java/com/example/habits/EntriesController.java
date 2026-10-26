@@ -18,8 +18,9 @@ public class EntriesController {
     @GetMapping("/entries") public ResponseEntity<?> week(@RequestParam String week,@org.springframework.security.core.annotation.AuthenticationPrincipal org.springframework.security.oauth2.jwt.Jwt jwt) {
         LocalDate start = parseDay(week);
         if (start.getDayOfWeek().getValue() != 1) throw new IllegalArgumentException();
-        return read(jwt.getSubject(),start);
+        return readOwn(jwt,start);
     }
+    private ResponseEntity<?> readOwn(org.springframework.security.oauth2.jwt.Jwt jwt,LocalDate start){return ResponseEntity.ok().cacheControl(CacheControl.noStore()).body(Map.of("entries",repository.weekForUser(jwt.getSubject(),start.toString(),start.plusDays(6).toString()),"goals",goalsFor(jwt.getSubject()),"username",DynamoEntryRepository.publicName(jwt.getClaimAsString("username"))));}
     private ResponseEntity<?> read(String user,LocalDate start){return ResponseEntity.ok().cacheControl(CacheControl.noStore()).body(Map.of("entries",repository.weekForUser(user,start.toString(),start.plusDays(6).toString()),"goals",goalsFor(user)));}
     @GetMapping("/me/profile") public ResponseEntity<?> profile(@org.springframework.security.core.annotation.AuthenticationPrincipal org.springframework.security.oauth2.jwt.Jwt jwt){String name=DynamoEntryRepository.publicName(jwt.getClaimAsString("username"));repository.ensureProfile(jwt.getSubject(),name);return ResponseEntity.ok().cacheControl(CacheControl.noStore()).body(Map.of("username",name,"goals",goalsFor(jwt.getSubject())));}
     private Goals goalsFor(String user){Goals goals=repository.goals(user);return goals==null?Goals.DEFAULT:goals;}
@@ -33,7 +34,7 @@ public class EntriesController {
         LocalDate start=parseDay(week);if(start.getDayOfWeek().getValue()!=1)throw new IllegalArgumentException();
         String user=repository.publicUser(username);if(user==null)throw new org.springframework.web.server.ResponseStatusException(org.springframework.http.HttpStatus.NOT_FOUND,"User not found");return read(user,start);
     }
-    @GetMapping("/me/entries") public ResponseEntity<?> ownWeek(@RequestParam String week,@org.springframework.security.core.annotation.AuthenticationPrincipal org.springframework.security.oauth2.jwt.Jwt jwt){LocalDate start=parseDay(week);if(start.getDayOfWeek().getValue()!=1)throw new IllegalArgumentException();return read(jwt.getSubject(),start);}
+    @GetMapping("/me/entries") public ResponseEntity<?> ownWeek(@RequestParam String week,@org.springframework.security.core.annotation.AuthenticationPrincipal org.springframework.security.oauth2.jwt.Jwt jwt){LocalDate start=parseDay(week);if(start.getDayOfWeek().getValue()!=1)throw new IllegalArgumentException();return readOwn(jwt,start);}
     @PutMapping("/entries/{day}") public ResponseEntity<?> save(@PathVariable String day, @RequestBody Map<String, Object> body,@org.springframework.security.core.annotation.AuthenticationPrincipal org.springframework.security.oauth2.jwt.Jwt jwt) {return saveFor(jwt.getSubject(),day,body);}
     @PutMapping("/me/entries/{day}") public ResponseEntity<?> ownSave(@PathVariable String day,@RequestBody Map<String,Object> body,@org.springframework.security.core.annotation.AuthenticationPrincipal org.springframework.security.oauth2.jwt.Jwt jwt){return saveFor(jwt.getSubject(),day,body);}
     ResponseEntity<?> saveFor(String user,String day,Map<String,Object> body){

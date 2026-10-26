@@ -2,7 +2,8 @@ import {Injectable,inject,signal,isDevMode} from '@angular/core';
 import {HttpClient,HttpHeaders,HttpErrorResponse} from '@angular/common/http';
 import {firstValueFrom,timeout} from 'rxjs';
 import {ConfigService} from './config.service';
-interface AuthResult {AuthenticationResult?:{AccessToken:string;ExpiresIn:number;RefreshToken?:string};ChallengeName?:string;Session?:string;ChallengeParameters?:Record<string,string>;}
+import {creationOptions,requestOptions,credentialJSON} from './passkeys';
+interface AuthResult {CredentialCreationOptions?:unknown;AuthenticationResult?:{AccessToken:string;ExpiresIn:number;RefreshToken?:string};ChallengeName?:string;Session?:string;ChallengeParameters?:Record<string,string>;}
 @Injectable({providedIn:'root'})
 export class AuthService {
   private http=inject(HttpClient);private config=inject(ConfigService);private accessToken:string|null=null;private expiry=0;
@@ -16,6 +17,31 @@ export class AuthService {
   private refresh(){if(this.refreshing)return this.refreshing;const generation=this.generation;this.refreshing=this.call('InitiateAuth',{ClientId:this.config.value.clientId,AuthFlow:'REFRESH_TOKEN_AUTH',AuthParameters:{REFRESH_TOKEN:this.refreshToken}}).then(result=>{if(generation===this.generation)this.accept(result);}).catch(error=>{if(generation===this.generation&&error instanceof HttpErrorResponse&&error.status===400)this.clear();throw error;}).finally(()=>{this.refreshing=null;});return this.refreshing;}
   async ensureSession(){if(!this.devSession&&this.refreshToken&&Date.now()>=this.expiry-60000)await this.refresh();}
 
+  get passkeysSupported(){return this.config.value.passkeys===true&&typeof PublicKeyCredential!=='undefined'&&!!navigator.credentials&&window.isSecureContext;}
+  get rememberedUsername(){try{return localStorage.getItem(this.storageKey+'.username')||'';}catch{return '';}}
+  private rememberUsername(username:string){try{localStorage.setItem(this.storageKey+'.username',username);}catch{}}
+  async registerPasskey(username:string){
+    if(!this.passkeysSupported||this.devSession)throw new Error('Passkey setup is available on the live site in a supported browser.');
+    await this.ensureSession();const token=this.token,generation=this.generation;
+    const start=await this.call('StartWebAuthnRegistration',{AccessToken:token});
+    if(generation!==this.generation)throw new Error('Sign in again to add a passkey.');
+    const credential=await navigator.credentials.create({publicKey:creationOptions(start.CredentialCreationOptions)}) as PublicKeyCredential|null;
+    if(!credential)throw new Error('Passkey setup was cancelled.');
+    if(generation!==this.generation)throw new Error('Sign in again to add a passkey.');
+    await this.call('CompleteWebAuthnRegistration',{AccessToken:token,Credential:credentialJSON(credential)});this.rememberUsername(username);
+  }
+  async loginWithPasskey(username:string,remember:boolean){
+    if(!this.passkeysSupported)throw new Error('Passkeys are not available in this browser. Sign in with your password.');
+    const name=username.trim();if(!name)throw new Error('Enter your username first.');
+    const generation=this.generation;
+    const start=await this.call('InitiateAuth',{ClientId:this.config.value.clientId,AuthFlow:'USER_AUTH',AuthParameters:{USERNAME:name,PREFERRED_CHALLENGE:'WEB_AUTHN'}});
+    if(start.ChallengeName!=='WEB_AUTHN'||!start.Session||!start.ChallengeParameters?.['CREDENTIAL_REQUEST_OPTIONS'])throw new Error('Sign in with your password, then add a passkey in User Settings.');
+    const credential=await navigator.credentials.get({publicKey:requestOptions(start.ChallengeParameters['CREDENTIAL_REQUEST_OPTIONS'])}) as PublicKeyCredential|null;
+    if(!credential)throw new Error('Passkey sign-in was cancelled.');
+    const result=await this.call('RespondToAuthChallenge',{ClientId:this.config.value.clientId,ChallengeName:'WEB_AUTHN',Session:start.Session,ChallengeResponses:{USERNAME:name,CREDENTIAL:JSON.stringify(credentialJSON(credential))}});
+    if(generation!==this.generation)throw new Error('Sign-in was cancelled. Please try again.');
+    this.finishLogin(result,remember);if(remember)this.rememberUsername(name);
+  }
   get canDevLogin(){try{const url=new URL(this.config.value.apiUrl);return isDevMode()&&this.config.value.devLogin===true&&url.protocol==='http:'&&['127.0.0.1','localhost','[::1]'].includes(url.hostname);}catch{return false;}}
   async devLogin(){
     if(!this.canDevLogin)throw new Error('Dev Login is only available locally.');
@@ -32,6 +58,10 @@ export class AuthService {
     const result=challenge?await this.call('RespondToAuthChallenge',{ClientId:this.config.value.clientId,ChallengeName:'NEW_PASSWORD_REQUIRED',Session:challenge.session,ChallengeResponses:{USERNAME:challenge.username,NEW_PASSWORD:newPassword}}):await this.call('InitiateAuth',{ClientId:this.config.value.clientId,AuthFlow:'USER_PASSWORD_AUTH',AuthParameters:{USERNAME:username.trim(),PASSWORD:password}});
     if(result.ChallengeName==='NEW_PASSWORD_REQUIRED'&&result.Session){this.challenge.set({session:result.Session,username:result.ChallengeParameters?.['USER_ID_FOR_SRP']||username.trim()});return;}
     if(!result.AuthenticationResult)throw new Error('Check this account’s sign-in settings in Cognito.');
+    this.finishLogin(result,remember);if(remember)this.rememberUsername(username.trim());
+  }
+  private finishLogin(result:AuthResult,remember:boolean){
+    if(!result.AuthenticationResult)throw new Error('Could not complete sign-in. Please try again.');
     this.forget();this.refreshToken=result.AuthenticationResult.RefreshToken??null;
     if(remember&&this.refreshToken){try{localStorage.setItem(this.storageKey,JSON.stringify({token:this.refreshToken,until:Date.now()+30*86400000}));}catch{this.refreshToken=null;throw new Error('This browser cannot remember you. Uncheck Remember me and sign in again.');}}
     this.devSession=false;this.challenge.set(null);this.accept(result);
@@ -39,5 +69,5 @@ export class AuthService {
   async changePassword(previous:string,next:string){await this.ensureSession();if(this.devSession)throw new Error('Password changes are available for Cognito accounts only.');await this.call('ChangePassword',{AccessToken:this.token,PreviousPassword:previous,ProposedPassword:next});}
   clear(){this.generation++;this.forget();this.refreshToken=null;this.accessToken=null;this.expiry=0;this.devSession=false;this.signedIn.set(false);this.challenge.set(null);}
   async logout(){const token=this.token,local=this.devSession;this.clear();if(token&&!local)await this.call('GlobalSignOut',{AccessToken:token});}
-  error(error:unknown):string{if(error instanceof HttpErrorResponse)return error.error?.message||'Sign-in failed. Check your username and password.';return error instanceof Error?error.message:'Could not sign in.';}
+  error(error:unknown):string{if(error instanceof Error&&['NotAllowedError','AbortError'].includes(error.name))return 'Passkey request cancelled or timed out. You can try again or use your password.';if(error instanceof HttpErrorResponse)return error.error?.message||'Sign-in failed. Check your username and password.';return error instanceof Error?error.message:'Could not sign in.';}
 }

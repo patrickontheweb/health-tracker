@@ -4,7 +4,7 @@ import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 class EntriesControllerTest {
-    private org.springframework.security.oauth2.jwt.Jwt jwt(){return org.springframework.security.oauth2.jwt.Jwt.withTokenValue("test").header("alg","test").subject("test-user").build();}
+    private org.springframework.security.oauth2.jwt.Jwt jwt(){return org.springframework.security.oauth2.jwt.Jwt.withTokenValue("test").header("alg","test").subject("test-user").claim("username","Test-User").build();}
     @Test void settingsAreScopedToAuthenticatedUserAndRejectInvalidGoals(){
         var repo=mock(EntryRepository.class);var controller=new EntriesController(repo,new LogOwner("test-user"));
         var goals=new Goals(8,3,200);when(repo.saveGoals("test-user",goals)).thenReturn(goals);
@@ -15,7 +15,10 @@ class EntriesControllerTest {
     }
     @Test void mondayToSundayAcrossYears() {
         EntryRepository repo = mock(EntryRepository.class);when(repo.weekForUser(eq("test-user"),anyString(), anyString())).thenReturn(Map.of());
-        assertEquals(200, new EntriesController(repo,new LogOwner("test-user")).week("2025-12-29",jwt()).getStatusCode().value());
+        var response=new EntriesController(repo,new LogOwner("test-user")).week("2025-12-29",jwt());
+        assertEquals(200,response.getStatusCode().value());
+        assertEquals("test-user",((Map<?,?>)response.getBody()).get("username"));
+        verify(repo,never()).ensureProfile(anyString(),anyString());
         verify(repo).weekForUser("test-user","2025-12-29", "2026-01-04");
         assertThrows(IllegalArgumentException.class, () -> new EntriesController(repo,new LogOwner("test-user")).week("2026-01-01",jwt()));
     }

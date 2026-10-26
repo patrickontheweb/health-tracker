@@ -111,3 +111,7 @@ footer{text-align:right;border-top:0}
 .user-strip-login{margin-left:auto}
 
 .remember-me{display:flex;align-items:center;gap:8px;margin:16px 0}.remember-me input{width:auto;margin:0}
+
+.install-bar{margin:-8px 0 16px;text-align:right}.install-bar .hint{max-width:36rem;margin:8px 0 0 auto;text-align:left}.passkey-login{margin:16px 0 0;width:100%}.passkey-settings{border-top:1px solid #dce3ee;margin-top:24px;padding-top:16px}
+
+.install-bar>.text-button{color:#e9f2ff}.install-bar .hint{color:#d6e1f1}

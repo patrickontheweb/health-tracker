@@ -1,7 +1,7 @@
 import {Injectable,inject} from '@angular/core';
 import {HttpClient} from '@angular/common/http';
 import {firstValueFrom,timeout} from 'rxjs';
-export interface AppConfig {apiUrl:string;region:string;clientId:string;devLogin?:boolean;}
+export interface AppConfig {apiUrl:string;region:string;clientId:string;devLogin?:boolean;passkeys?:boolean;}
 @Injectable({providedIn:'root'})
 export class ConfigService {
   private http=inject(HttpClient);
