@@ -11,8 +11,8 @@ export function userPage(path:string){
   return {username:parts[0].toLowerCase(),date};
 }
 export type Entries=Record<string,Entry>;
-export function monthGrid(month:string):(string|null)[]{const first=parseDate(`${month}-01`),offset=(first.getDay()+6)%7,last=new Date(first.getFullYear(),first.getMonth()+1,0,12).getDate();return Array.from({length:Math.ceil((offset+last)/7)*7},(_,i)=>i<offset||i>=offset+last?null:`${month}-${String(i-offset+1).padStart(2,'0')}`);}
-export function monthRows(month:string):{week:string;days:(string|null)[]}[]{const days=monthGrid(month);return Array.from({length:days.length/7},(_,index)=>{const row=days.slice(index*7,index*7+7);return {week:weekKeys(row.find((day):day is string=>day!==null)!)[0],days:row};});}
+export function monthGrid(month:string):string[]{const first=parseDate(`${month}-01`),offset=(first.getDay()+6)%7,last=new Date(first.getFullYear(),first.getMonth()+1,0,12).getDate();return Array.from({length:Math.ceil((offset+last)/7)*7},(_,i)=>{const day=new Date(first);day.setDate(1-offset+i);return dateKey(day);});}
+export function monthRows(month:string):{week:string;days:string[]}[]{const days=monthGrid(month);return Array.from({length:days.length/7},(_,index)=>{const row=days.slice(index*7,index*7+7);return {week:row[0],days:row};});}
 export function shiftMonth(month:string,offset:number):string{const date=parseDate(`${month}-01`);date.setMonth(date.getMonth()+offset);return dateKey(date).slice(0,7);}
 export function produceDayState(day:string,today:string,entries:Entries|null,goal=5):'future'|'met'|'below'|'unknown'{if(day>today)return 'future';if(entries===null)return 'unknown';return (entries[day]?.produce||0)>=goal?'met':'below';}
 export function dateKey(date=new Date()):string{return `${date.getFullYear()}-${String(date.getMonth()+1).padStart(2,'0')}-${String(date.getDate()).padStart(2,'0')}`;}
