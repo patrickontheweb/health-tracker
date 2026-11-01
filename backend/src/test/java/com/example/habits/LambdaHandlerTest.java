@@ -5,16 +5,22 @@ import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.nio.charset.StandardCharsets;
 import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 class LambdaHandlerTest {
+    private static final java.util.Map<String,String> previousProperties=new java.util.HashMap<>();
     @BeforeAll static void configure() {
-        System.setProperty("habits.table", "unused-test-table");
-        System.setProperty("habits.issuer", "https://cognito-idp.us-east-1.amazonaws.com/test");
-        System.setProperty("habits.client-id", "test-client");
-        System.setProperty("habits.origin", "http://localhost:4200");
-        System.setProperty("aws.region", "us-east-1");
+        java.util.Map.of("habits.table","unused-test-table",
+            "habits.issuer","https://cognito-idp.us-east-1.amazonaws.com/test",
+            "habits.client-id","test-client","habits.origin","http://localhost:4200",
+            "aws.region","us-east-1").forEach((key,value)->{
+                previousProperties.put(key,System.getProperty(key));System.setProperty(key,value);
+            });
+    }
+    @AfterAll static void restoreProperties() {
+        previousProperties.forEach((key,value)->{if(value==null)System.clearProperty(key);else System.setProperty(key,value);});
     }
     String call(String method,String path,String query) throws Exception {
         Context context=mock(Context.class);when(context.getLogger()).thenReturn(mock(LambdaLogger.class));when(context.getAwsRequestId()).thenReturn("test-request");when(context.getRemainingTimeInMillis()).thenReturn(30000);
